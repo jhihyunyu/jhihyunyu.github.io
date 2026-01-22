@@ -16,8 +16,8 @@
     button { padding: 10px 14px; border: 1px solid #111; background:#111; color:#fff; border-radius: 10px; cursor:pointer; }
     button.secondary { background:#fff; color:#111; }
     table { width:100%; border-collapse: collapse; margin-top: 14px; }
-    th, td { padding: 10px; border-bottom: 1px solid #eee; text-align:left; }
-    th { background: #fafafa; position: sticky; top: 0; }
+    th, td { padding: 10px; border-bottom: 1px solid #eee; text-align:left; vertical-align: top; }
+    th { background: #fafafa; position: sticky; top: 0; z-index: 1; }
     .muted { color:#777; font-size: 12px; }
     .err { color: #b00020; white-space: pre-wrap; }
     .footer { margin-top: 18px; color:#777; font-size: 12px; }
@@ -38,6 +38,34 @@
       <div class="muted">總支出（TWD）</div>
       <strong id="sumTwd">-</strong>
       <div class="muted">匯率：1 EUR = <span id="rateLabel">34.5</span> TWD</div>
+    </div>
+
+    <div class="card" style="flex: 1; min-width: 280px;">
+      <div class="row">
+        <div>
+          <label>篩選：人</label>
+          <select id="filterPerson">
+            <option value="">全部</option>
+          </select>
+        </div>
+        <div>
+          <label>篩選：分類</label>
+          <select id="filterCategory">
+            <option value="">全部</option>
+          </select>
+        </div>
+        <div>
+          <label>關鍵字（項目/備註）</label>
+          <input id="filterKeyword" placeholder="例如：咖啡 / 車票" />
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button id="btnApply">套用</button>
+          <button class="secondary" id="btnReset">重設</button>
+        </div>
+      </div>
+      <div class="muted" style="margin-top:10px;">
+        新增/修改記帳請到 Google Sheets（你跟朋友共同編輯）→ 網站讀取顯示
+      </div>
     </div>
   </div>
 
@@ -65,60 +93,202 @@
   </div>
 
 <script>
-  const SHEET_CSV_URL =
-    "https://docs.google.com/spreadsheets/d/1-bY7b7pZpFN8ANpTkRKSzQ2FARgy0KYPkEMaqU7CVIk/export?format=csv";
+  // === 固定設定：你的 Google Sheet + 分頁（已 URL encode）===
+  const SPREADSHEET_ID = "1-bY7b7pZpFN8ANpTkRKSzQ2FARgy0KYPkEMaqU7CVIk";
+  const SHEET_NAME = "歐洲記帳行程/記帳";
+  const SHEET_NAME_ENCODED = encodeURIComponent(SHEET_NAME);
 
+  // gviz 方式輸出 csv，比 export?format=csv 更穩
+  const SHEET_CSV_URL =
+    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAME_ENCODED}`;
+
+  // 旅行用匯率（可直接改）
   const EUR_TO_TWD = 34.5;
 
+  // === DOM ===
   const tbody = document.getElementById("tbody");
   const statusEl = document.getElementById("status");
   const errorEl = document.getElementById("error");
   const sumEurEl = document.getElementById("sumEur");
   const sumTwdEl = document.getElementById("sumTwd");
+  const rateLabel = document.getElementById("rateLabel");
+  rateLabel.textContent = EUR_TO_TWD;
 
-  function parseCSV(text) {
-    const lines = text.replace(/\r/g, "").split("\n").filter(l => l.trim());
-    const headers = lines[0].split(",");
-    return lines.slice(1).map(line => {
-      const cols = line.split(",");
-      const obj = {};
-      headers.forEach((h, i) => obj[h.trim()] = (cols[i] || "").trim());
-      return obj;
-    });
+  const filterPerson = document.getElementById("filterPerson");
+  const filterCategory = document.getElementById("filterCategory");
+  const filterKeyword = document.getElementById("filterKeyword");
+  const btnApply = document.getElementById("btnApply");
+  const btnReset = document.getElementById("btnReset");
+
+  let rows = [];
+  let viewRows = [];
+
+  // === Utils ===
+  function escapeHtml(s) {
+    return String(s)
+      .replaceAll("&","&amp;").replaceAll("<","&lt;")
+      .replaceAll(">","&gt;").replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
   }
 
-  function toNum(v) {
+  function toNumber(v) {
     const n = Number(String(v).replace(/[^\d.-]/g, ""));
     return Number.isFinite(n) ? n : 0;
   }
 
-  fetch(SHEET_CSV_URL)
-    .then(r => r.text())
-    .then(text => {
-      const rows = parseCSV(text);
-      let total = 0;
+  function uniq(arr) {
+    return Array.from(new Set(arr.filter(v => v !== "")))
+      .sort((a,b)=>a.localeCompare(b,"zh-Hant"));
+  }
 
-      tbody.innerHTML = rows.map(r => {
-        const eur = toNum(r["金額(EUR)"]);
-        total += eur;
-        return `<tr>
-          <td>${r["日期"] || ""}</td>
-          <td>${r["人"] || ""}</td>
-          <td>${r["項目"] || ""}</td>
-          <td>${r["分類"] || ""}</td>
-          <td>${r["金額(EUR)"] || ""}</td>
-          <td>${r["備註"] || ""}</td>
-        </tr>`;
-      }).join("");
+  // ✅ 正確 CSV 解析（支援引號、欄位內逗號）
+  function parseCSV(text) {
+    const lines = text.replace(/\r/g, "").split("\n").filter(l => l.trim().length);
+    if (!lines.length) return [];
 
-      sumEurEl.textContent = total.toFixed(2);
-      sumTwdEl.textContent = Math.round(total * EUR_TO_TWD).toLocaleString("zh-Hant-TW");
-      statusEl.textContent = `已載入 ${rows.length} 筆記帳`;
-    })
-    .catch(err => {
-      errorEl.textContent = "讀取失敗，請確認 Google Sheets 已設為可公開存取";
-      statusEl.textContent = "載入失敗";
+    const splitLine = (line) => {
+      const res = [];
+      let cur = "", inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') {
+          if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+          else inQ = !inQ;
+        } else if (c === "," && !inQ) {
+          res.push(cur); cur = "";
+        } else cur += c;
+      }
+      res.push(cur);
+      return res.map(s => s.trim());
+    };
+
+    const header = splitLine(lines[0]).map(h => h.trim());
+    const out = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = splitLine(lines[i]);
+      const obj = {};
+      header.forEach((h, idx) => obj[h] = (cols[idx] ?? ""));
+      out.push(obj);
+    }
+    return out;
+  }
+
+  // 欄位容錯：讓你之後改英文欄名也能吃
+  function getField(r, zh, en1, en2) {
+    return (r[zh] ?? r[en1] ?? r[en2] ?? "").toString().trim();
+  }
+
+  function renderFilters() {
+    const persons = uniq(rows.map(r => getField(r,"人","person","Person")));
+    const cats    = uniq(rows.map(r => getField(r,"分類","category","Category")));
+
+    filterPerson.innerHTML =
+      `<option value="">全部</option>` + persons.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("");
+
+    filterCategory.innerHTML =
+      `<option value="">全部</option>` + cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+  }
+
+  function renderTable() {
+    tbody.innerHTML = viewRows.map(r => {
+      const date   = getField(r,"日期","date","Date");
+      const person = getField(r,"人","person","Person");
+      const item   = getField(r,"項目","item","Item");
+      const cat    = getField(r,"分類","category","Category");
+      const eur    = (r["金額(EUR)"] ?? r["EUR"] ?? r["AmountEUR"] ?? r["amount"] ?? "").toString().trim();
+      const note   = getField(r,"備註","note","Note");
+
+      return `<tr>
+        <td>${escapeHtml(date)}</td>
+        <td>${escapeHtml(person)}</td>
+        <td>${escapeHtml(item)}</td>
+        <td>${escapeHtml(cat)}</td>
+        <td>${escapeHtml(eur)}</td>
+        <td>${escapeHtml(note)}</td>
+      </tr>`;
+    }).join("");
+
+    statusEl.textContent = `共 ${viewRows.length} 筆`;
+  }
+
+  function renderSum() {
+    const totalEur = viewRows.reduce((acc, r) => {
+      const eur = (r["金額(EUR)"] ?? r["EUR"] ?? r["AmountEUR"] ?? r["amount"] ?? 0);
+      return acc + toNumber(eur);
+    }, 0);
+
+    sumEurEl.textContent = totalEur.toFixed(2);
+    sumTwdEl.textContent = Math.round(totalEur * EUR_TO_TWD).toLocaleString("zh-Hant-TW");
+  }
+
+  function applyFilter() {
+    const p = filterPerson.value.trim();
+    const c = filterCategory.value.trim();
+    const k = filterKeyword.value.trim().toLowerCase();
+
+    viewRows = rows.filter(r => {
+      const person = getField(r,"人","person","Person");
+      const cat    = getField(r,"分類","category","Category");
+      const item   = getField(r,"項目","item","Item");
+      const note   = getField(r,"備註","note","Note");
+
+      if (p && person !== p) return false;
+      if (c && cat !== c) return false;
+
+      if (k) {
+        const hay = (item + " " + note).toLowerCase();
+        if (!hay.includes(k)) return false;
+      }
+      return true;
     });
+
+    renderTable();
+    renderSum();
+  }
+
+  async function load() {
+    errorEl.textContent = "";
+    statusEl.textContent = "載入中…";
+
+    try {
+      const res = await fetch(SHEET_CSV_URL, { cache: "no-store" });
+      if (!res.ok) throw new Error("讀取失敗：" + res.status);
+
+      const text = await res.text();
+      rows = parseCSV(text);
+
+      renderFilters();
+      viewRows = rows;
+      renderTable();
+      renderSum();
+
+      statusEl.textContent = `已載入 ${rows.length} 筆（分頁：${SHEET_NAME}）`;
+
+    } catch (e) {
+      errorEl.textContent =
+        "讀取失敗。\n\n請確認：\n" +
+        "1) Google Sheets 已「發佈到網路」\n" +
+        "2) 右上角「分享」→ 一般存取：知道連結的任何人（檢視者）\n" +
+        "3) 分頁名稱正確（你的是：歐洲記帳行程/記帳）\n\n" +
+        "技術訊息：" + e.message + "\n\n" +
+        "你也可以直接用瀏覽器開這個測試連結：\n" +
+        SHEET_CSV_URL;
+
+      statusEl.textContent = "載入失敗";
+    }
+  }
+
+  btnApply.addEventListener("click", applyFilter);
+  btnReset.addEventListener("click", () => {
+    filterPerson.value = "";
+    filterCategory.value = "";
+    filterKeyword.value = "";
+    viewRows = rows;
+    renderTable();
+    renderSum();
+  });
+
+  load();
 </script>
 </body>
 </html>
