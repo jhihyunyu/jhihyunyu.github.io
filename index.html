@@ -1,11 +1,124 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="zh-Hant">
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>歐洲旅遊記帳</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", Arial, sans-serif; margin: 20px; }
+    h1 { margin: 0 0 8px; }
+    .sub { color: #555; margin-bottom: 16px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 12px 14px; background: #fff; }
+    .card strong { display:block; font-size: 18px; margin-top: 4px; }
+    label { font-size: 12px; color:#666; display:block; margin-bottom: 6px; }
+    select, input { padding: 10px; border: 1px solid #ccc; border-radius: 10px; min-width: 180px; }
+    button { padding: 10px 14px; border: 1px solid #111; background:#111; color:#fff; border-radius: 10px; cursor:pointer; }
+    button.secondary { background:#fff; color:#111; }
+    table { width:100%; border-collapse: collapse; margin-top: 14px; }
+    th, td { padding: 10px; border-bottom: 1px solid #eee; text-align:left; }
+    th { background: #fafafa; position: sticky; top: 0; }
+    .muted { color:#777; font-size: 12px; }
+    .err { color: #b00020; white-space: pre-wrap; }
+    .footer { margin-top: 18px; color:#777; font-size: 12px; }
+    .pill { display:inline-block; padding: 4px 10px; border:1px solid #ddd; border-radius:999px; font-size:12px; color:#555; }
+  </style>
 </head>
+
 <body>
-  <h1>我的歐洲旅行 ✈️</h1>
-  <p>這是我的 GitHub Pages 網站</p>
+  <h1>歐洲旅遊記帳</h1>
+  <div class="sub">首頁就是記帳表（資料已連接 Google Sheets）</div>
+
+  <div class="row">
+    <div class="card">
+      <div class="muted">總支出（EUR）</div>
+      <strong id="sumEur">-</strong>
+    </div>
+    <div class="card">
+      <div class="muted">總支出（TWD）</div>
+      <strong id="sumTwd">-</strong>
+      <div class="muted">匯率：1 EUR = <span id="rateLabel">34.5</span> TWD</div>
+    </div>
+  </div>
+
+  <div id="status" class="muted" style="margin-top: 12px;">載入中…</div>
+  <div id="error" class="err" style="margin-top: 8px;"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>日期</th>
+        <th>人</th>
+        <th>項目</th>
+        <th>分類</th>
+        <th>金額(EUR)</th>
+        <th>備註</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <div class="footer">
+    <span class="pill">GitHub Pages</span>
+    <span class="pill">Google Sheets</span>
+    <span class="pill">No Login</span>
+  </div>
+
+<script>
+  const SHEET_CSV_URL =
+    "https://docs.google.com/spreadsheets/d/1-bY7b7pZpFN8ANpTkRKSzQ2FARgy0KYPkEMaqU7CVIk/export?format=csv";
+
+  const EUR_TO_TWD = 34.5;
+
+  const tbody = document.getElementById("tbody");
+  const statusEl = document.getElementById("status");
+  const errorEl = document.getElementById("error");
+  const sumEurEl = document.getElementById("sumEur");
+  const sumTwdEl = document.getElementById("sumTwd");
+
+  function parseCSV(text) {
+    const lines = text.replace(/\r/g, "").split("\n").filter(l => l.trim());
+    const headers = lines[0].split(",");
+    return lines.slice(1).map(line => {
+      const cols = line.split(",");
+      const obj = {};
+      headers.forEach((h, i) => obj[h.trim()] = (cols[i] || "").trim());
+      return obj;
+    });
+  }
+
+  function toNum(v) {
+    const n = Number(String(v).replace(/[^\d.-]/g, ""));
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  fetch(SHEET_CSV_URL)
+    .then(r => r.text())
+    .then(text => {
+      const rows = parseCSV(text);
+      let total = 0;
+
+      tbody.innerHTML = rows.map(r => {
+        const eur = toNum(r["金額(EUR)"]);
+        total += eur;
+        return `<tr>
+          <td>${r["日期"] || ""}</td>
+          <td>${r["人"] || ""}</td>
+          <td>${r["項目"] || ""}</td>
+          <td>${r["分類"] || ""}</td>
+          <td>${r["金額(EUR)"] || ""}</td>
+          <td>${r["備註"] || ""}</td>
+        </tr>`;
+      }).join("");
+
+      sumEurEl.textContent = total.toFixed(2);
+      sumTwdEl.textContent = Math.round(total * EUR_TO_TWD).toLocaleString("zh-Hant-TW");
+      statusEl.textContent = `已載入 ${rows.length} 筆記帳`;
+    })
+    .catch(err => {
+      errorEl.textContent = "讀取失敗，請確認 Google Sheets 已設為可公開存取";
+      statusEl.textContent = "載入失敗";
+    });
+</script>
 </body>
 </html>
