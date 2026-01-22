@@ -24,7 +24,7 @@
     .footer { margin-top: 18px; color:#777; font-size: 12px; }
     .pill { display:inline-block; padding: 4px 10px; border:1px solid #ddd; border-radius:999px; font-size:12px; color:#555; }
     .mini { font-size: 12px; }
-    .stack { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
+    .stack { display:flex; gap:10px; align-items:flex-end; flex-wrap: wrap; }
     .inline { display:flex; gap:8px; align-items:center; }
   </style>
 </head>
@@ -47,10 +47,18 @@
     <div class="card" style="flex: 1; min-width: 320px;">
       <div class="stack">
         <div>
-          <label>時間（日期）</label>
+          <label>月份</label>
+          <select id="filterMonth">
+            <option value="">全部</option>
+          </select>
+        </div>
+
+        <div>
+          <label>日期</label>
           <select id="filterDate">
             <option value="">全部</option>
           </select>
+          <div class="muted mini">先選月份再選日期（日期會跟著月份更新）</div>
         </div>
 
         <div>
@@ -63,7 +71,7 @@
             <input id="newPerson" placeholder="新增人名（例如：Ula）" />
             <button class="ghost" id="btnAddPerson">新增</button>
           </div>
-          <div class="muted mini">新增的人名只會存在你這台裝置（不會回寫到 Sheets）。</div>
+          <div class="muted mini">新增的人名只存在此裝置（不回寫到 Sheets）。</div>
         </div>
 
         <div>
@@ -73,7 +81,7 @@
           </select>
         </div>
 
-        <div style="flex:1; min-width: 220px;">
+        <div style="min-width: 220px; flex:1;">
           <label>關鍵字（項目/備註）</label>
           <input id="filterKeyword" placeholder="例如：咖啡 / 車票" />
         </div>
@@ -120,10 +128,10 @@
   const SHEET_CSV_URL =
     `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
 
-  // 旅行用匯率
+  // 匯率
   const EUR_TO_TWD = 34.5;
 
-  // === LocalStorage for custom persons ===
+  // LocalStorage for custom persons
   const LS_CUSTOM_PERSONS = "travel_custom_persons_v1";
 
   // === DOM ===
@@ -135,6 +143,7 @@
   const rateLabel = document.getElementById("rateLabel");
   rateLabel.textContent = EUR_TO_TWD;
 
+  const filterMonth = document.getElementById("filterMonth");
   const filterDate = document.getElementById("filterDate");
   const filterPerson = document.getElementById("filterPerson");
   const filterCategory = document.getElementById("filterCategory");
@@ -148,6 +157,9 @@
   let rows = [];
   let viewRows = [];
   let customPersons = loadCustomPersons();
+
+  // month -> array of date display strings
+  let monthToDates = new Map();
 
   // === Utils ===
   function escapeHtml(s) {
@@ -203,9 +215,44 @@
     return (r[zh] ?? r[en1] ?? r[en2] ?? "").toString().trim();
   }
 
-  function normalizeDate(s) {
-    // 保持原樣即可：你的下拉選單會直接用表格中的日期字串
-    return (s ?? "").toString().trim();
+  // 把「日期字串」轉成可用的 year-month / year-month-day
+  function parseDateFlexible(dateStr) {
+    const s = (dateStr ?? "").toString().trim();
+    if (!s) return { raw: "", ymd: "", ym: "" };
+
+    // 允許：YYYY/MM/DD、YYYY-MM-DD、YYYY.MM.DD、YYYY/M/D
+    // 也允許：MM/DD（若沒有年份，ym/ymd 會空）
+    const cleaned = s.replace(/[.]/g, "/").replace(/-/g, "/").replace(/\s+/g, "");
+    const parts = cleaned.split("/").filter(Boolean);
+
+    let y = "", m = "", d = "";
+    if (parts.length === 3) {
+      if (parts[0].length === 4) { // YYYY/M/D
+        y = parts[0]; m = parts[1]; d = parts[2];
+      } else if (parts[2].length === 4) { // D/M/YYYY (很少見，先不主動交換)
+        // 若你未來真的用到這種格式再告訴我，我會做更聰明的判斷
+        y = parts[2]; m = parts[1]; d = parts[0];
+      } else { // M/D/YY 之類：先不推斷
+        return { raw: s, ymd: "", ym: "" };
+      }
+    } else if (parts.length === 2) {
+      // M/D（沒有年份）
+      return { raw: s, ymd: "", ym: "" };
+    } else {
+      return { raw: s, ymd: "", ym: "" };
+    }
+
+    const mm = String(m).padStart(2, "0");
+    const dd = String(d).padStart(2, "0");
+    const ymd = `${y}-${mm}-${dd}`;
+    const ym  = `${y}-${mm}`;
+    return { raw: s, ymd, ym };
+  }
+
+  function ymToLabel(ym) {
+    // "2026-04" -> "2026/04"
+    if (!ym || ym.length !== 7) return ym;
+    return ym.replace("-", "/");
   }
 
   function loadCustomPersons() {
@@ -224,19 +271,62 @@
     localStorage.setItem(LS_CUSTOM_PERSONS, JSON.stringify(customPersons));
   }
 
-  function renderFilters() {
-    // 日期下拉（時間）
-    const dates = uniq(rows.map(r => normalizeDate(getField(r,"日期","date","Date"))));
-    filterDate.innerHTML =
-      `<option value="">全部</option>` + dates.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join("");
+  function buildMonthDateIndex() {
+    monthToDates = new Map();
 
-    // 人（Sheet 人 + 自己新增的人）
+    rows.forEach(r => {
+      const rawDate = getField(r,"日期","date","Date");
+      const p = parseDateFlexible(rawDate);
+
+      // 存到 row 上，之後篩選不用重算
+      r.__date_raw = rawDate;
+      r.__date_ym  = p.ym;   // e.g. 2026-04
+      r.__date_ymd = p.ymd;  // e.g. 2026-04-09
+
+      if (p.ym) {
+        if (!monthToDates.has(p.ym)) monthToDates.set(p.ym, []);
+        monthToDates.get(p.ym).push(rawDate); // 日期下拉顯示用原本字串
+      }
+    });
+
+    // 去重 + 排序日期（用 ymd 排，排不到就維持）
+    for (const [ym, dates] of monthToDates.entries()) {
+      const uniqueDates = uniq(dates);
+      // 嘗試把日期依 ymd 排
+      uniqueDates.sort((a,b) => {
+        const pa = parseDateFlexible(a).ymd;
+        const pb = parseDateFlexible(b).ymd;
+        if (pa && pb) return pa.localeCompare(pb);
+        return a.localeCompare(b, "zh-Hant");
+      });
+      monthToDates.set(ym, uniqueDates);
+    }
+  }
+
+  function renderMonthOptions() {
+    const months = uniq(Array.from(monthToDates.keys()));
+    months.sort((a,b) => a.localeCompare(b)); // 2026-04, 2026-05...
+
+    filterMonth.innerHTML =
+      `<option value="">全部</option>` +
+      months.map(ym => `<option value="${escapeHtml(ym)}">${escapeHtml(ymToLabel(ym))}</option>`).join("");
+  }
+
+  function renderDateOptionsByMonth(selectedMonth) {
+    const dates = selectedMonth ? (monthToDates.get(selectedMonth) || []) : [];
+    filterDate.innerHTML =
+      `<option value="">全部</option>` +
+      (selectedMonth
+        ? dates.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join("")
+        : "");
+  }
+
+  function renderOtherFilters() {
     const personsFromSheet = rows.map(r => getField(r,"人","person","Person"));
     const persons = uniq(personsFromSheet.concat(customPersons));
     filterPerson.innerHTML =
       `<option value="">全部</option>` + persons.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("");
 
-    // 分類
     const cats = uniq(rows.map(r => getField(r,"分類","category","Category")));
     filterCategory.innerHTML =
       `<option value="">全部</option>` + cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
@@ -275,26 +365,38 @@
   }
 
   function applyFilter() {
-    const d = filterDate.value.trim();
-    const p = filterPerson.value.trim();
-    const c = filterCategory.value.trim();
+    const selectedMonth = filterMonth.value.trim(); // e.g. 2026-04
+    const selectedDateRaw = filterDate.value.trim(); // raw date string from sheet
+    const selectedPerson = filterPerson.value.trim();
+    const selectedCat = filterCategory.value.trim();
     const k = filterKeyword.value.trim().toLowerCase();
 
     viewRows = rows.filter(r => {
-      const date   = normalizeDate(getField(r,"日期","date","Date"));
+      // month filter
+      if (selectedMonth) {
+        if ((r.__date_ym || "") !== selectedMonth) return false;
+      }
+
+      // date filter (只有在選了某天才做精確比對 raw 字串)
+      if (selectedDateRaw) {
+        const raw = getField(r,"日期","date","Date");
+        if (raw.trim() !== selectedDateRaw) return false;
+      }
+
+      // person/category
       const person = getField(r,"人","person","Person");
       const cat    = getField(r,"分類","category","Category");
-      const item   = getField(r,"項目","item","Item");
-      const note   = getField(r,"備註","note","Note");
+      if (selectedPerson && person !== selectedPerson) return false;
+      if (selectedCat && cat !== selectedCat) return false;
 
-      if (d && date !== d) return false;
-      if (p && person !== p) return false;
-      if (c && cat !== c) return false;
-
+      // keyword
       if (k) {
+        const item = getField(r,"項目","item","Item");
+        const note = getField(r,"備註","note","Note");
         const hay = (item + " " + note).toLowerCase();
         if (!hay.includes(k)) return false;
       }
+
       return true;
     });
 
@@ -307,8 +409,10 @@
     if (!name) return;
     saveCustomPersons(customPersons.concat([name]));
     newPerson.value = "";
+
     // 重畫人下拉
-    renderFilters();
+    renderOtherFilters();
+
     // 直接切到新的人，方便你用它篩選
     filterPerson.value = name;
     applyFilter();
@@ -325,7 +429,15 @@
       const text = await res.text();
       rows = parseCSV(text);
 
-      renderFilters();
+      // 建索引：月份/日期
+      buildMonthDateIndex();
+      renderMonthOptions();
+      renderDateOptionsByMonth(""); // 預設沒選月份，日期選單先空
+
+      // 其他篩選
+      renderOtherFilters();
+
+      // 初始顯示全部
       viewRows = rows;
       renderTable();
       renderSum();
@@ -343,12 +455,24 @@
     }
   }
 
-  btnApply.addEventListener("click", applyFilter);
-  btnReset.addEventListener("click", () => {
+  // 月份改變 -> 重建日期下拉（並清掉已選日期）
+  filterMonth.addEventListener("change", () => {
+    const m = filterMonth.value.trim();
+    renderDateOptionsByMonth(m);
     filterDate.value = "";
+  });
+
+  btnApply.addEventListener("click", applyFilter);
+
+  btnReset.addEventListener("click", () => {
+    filterMonth.value = "";
+    renderDateOptionsByMonth("");
+    filterDate.value = "";
+
     filterPerson.value = "";
     filterCategory.value = "";
     filterKeyword.value = "";
+
     viewRows = rows;
     renderTable();
     renderSum();
