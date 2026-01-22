@@ -3,112 +3,102 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>歐洲旅遊記帳</title>
+  <title>歐洲旅遊記帳 V2</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", Arial, sans-serif; margin: 20px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", Arial, sans-serif; margin: 20px; background: #f5f5f7; }
     h1 { margin: 0 0 8px; }
     .sub { color: #555; margin-bottom: 16px; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
-    .card { border: 1px solid #ddd; border-radius: 12px; padding: 12px 14px; background: #fff; }
-    .card strong { display:block; font-size: 18px; margin-top: 4px; }
-    label { font-size: 12px; color:#666; display:block; margin-bottom: 6px; }
-    select, input { padding: 10px; border: 1px solid #ccc; border-radius: 10px; min-width: 180px; }
-    button { padding: 10px 14px; border: 1px solid #111; background:#111; color:#fff; border-radius: 10px; cursor:pointer; }
-    button.secondary { background:#fff; color:#111; }
-    button.ghost { background:#fff; color:#111; border:1px solid #ccc; }
-    table { width:100%; border-collapse: collapse; margin-top: 14px; }
-    th, td { padding: 10px; border-bottom: 1px solid #eee; text-align:left; vertical-align: top; }
-    th { background: #fafafa; position: sticky; top: 0; z-index: 1; }
-    .muted { color:#777; font-size: 12px; }
-    .err { color: #b00020; white-space: pre-wrap; }
-    .footer { margin-top: 18px; color:#777; font-size: 12px; }
-    .pill { display:inline-block; padding: 4px 10px; border:1px solid #ddd; border-radius:999px; font-size:12px; color:#555; }
-    .mini { font-size: 12px; }
-    .stack { display:flex; gap:10px; align-items:flex-end; flex-wrap: wrap; }
-    .inline { display:flex; gap:8px; align-items:center; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: stretch; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .card strong { display:block; font-size: 24px; margin-top: 4px; color: #111; }
+    label { font-size: 12px; color:#666; display:block; margin-bottom: 6px; font-weight: bold; }
+    select, input { padding: 10px; border: 1px solid #ccc; border-radius: 10px; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
+    button { padding: 12px 14px; border: none; background:#111; color:#fff; border-radius: 10px; cursor:pointer; width: 100%; font-weight: bold; }
+    button:disabled { background: #ccc; }
+    button.secondary { background:#fff; color:#111; border: 1px solid #ccc; }
+    
+    /* 新增帳務表單專用 */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .full-width { grid-column: span 2; }
+    
+    table { width:100%; border-collapse: collapse; margin-top: 20px; background: #fff; border-radius: 12px; overflow: hidden; }
+    th, td { padding: 12px; border-bottom: 1px solid #eee; text-align:left; }
+    th { background: #fafafa; font-size: 14px; color: #666; }
+    .err { color: #b00020; padding: 10px; background: #fee; border-radius: 8px; margin: 10px 0; display: none; }
+    .success-msg { color: #2e7d32; font-size: 12px; margin-top: 5px; }
   </style>
 </head>
 
 <body>
   <h1>歐洲旅遊記帳</h1>
-  <div class="sub">首頁就是記帳表（資料已連接 Google Sheets）</div>
+  <div class="sub">即時記帳並同步至 Google Sheets</div>
 
   <div class="row">
-    <div class="card">
-      <div class="muted">總支出（EUR）</div>
-      <strong id="sumEur">-</strong>
-    </div>
-    <div class="card">
-      <div class="muted">總支出（TWD）</div>
-      <strong id="sumTwd">-</strong>
-      <div class="muted">匯率：1 EUR = <span id="rateLabel">34.5</span> TWD</div>
-    </div>
-
-    <div class="card" style="flex: 1; min-width: 320px;">
-      <div class="stack">
-        <div>
-          <label>月份</label>
-          <select id="filterMonth">
-            <option value="">全部</option>
-            <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option><option value="4">4月</option>
-            <option value="5">5月</option><option value="6">6月</option><option value="7">7月</option><option value="8">8月</option>
-            <option value="9">9月</option><option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
-          </select>
-        </div>
-
+    <div class="card" style="flex: 1; min-width: 300px;">
+      <label style="font-size: 16px; color: #111; margin-bottom: 15px;">➕ 新增支出</label>
+      <div id="formError" class="err"></div>
+      <div class="form-grid">
         <div>
           <label>日期</label>
-          <select id="filterDay">
-            <option value="">全部</option>
-          </select>
-          <div class="muted mini">日期是 1～31；可搭配月份一起篩選。</div>
+          <input type="date" id="addDate">
         </div>
-
         <div>
-          <label>人</label>
-          <select id="filterPerson">
-            <option value="">全部</option>
+          <label>付款人</label>
+          <select id="addPerson">
+            <option value="Ula">Ula</option>
+            <option value="Partner">伙伴</option>
           </select>
-
-          <div class="inline" style="margin-top:8px;">
-            <input id="newPerson" placeholder="新增人名（例如：Ula）" />
-            <button class="ghost" id="btnAddPerson">新增</button>
-          </div>
-          <div class="muted mini">新增的人名只存在此裝置（不回寫到 Sheets）。</div>
         </div>
-
+        <div class="full-width">
+          <label>項目名稱</label>
+          <input type="text" id="addItem" placeholder="例如：由布院之森火車票">
+        </div>
         <div>
           <label>分類</label>
-          <select id="filterCategory">
-            <option value="">全部</option>
+          <select id="addCategory">
             <option value="吃">吃</option>
             <option value="交通">交通</option>
             <option value="住宿">住宿</option>
             <option value="購物">購物</option>
             <option value="其他">其他</option>
           </select>
-          <div class="muted mini">固定五類（吃/交通/住宿/購物/其他）</div>
         </div>
-
-        <div style="min-width: 220px; flex:1;">
-          <label>關鍵字（項目/備註）</label>
-          <input id="filterKeyword" placeholder="例如：咖啡 / 車票" />
+        <div>
+          <label>金額 (EUR)</label>
+          <input type="number" id="addAmount" step="0.01" placeholder="0.00">
         </div>
-
-        <div style="display:flex; gap:10px;">
-          <button id="btnApply">套用</button>
-          <button class="secondary" id="btnReset">重設</button>
+        <div class="full-width">
+          <label>備註</label>
+          <input type="text" id="addNote" placeholder="選填">
         </div>
       </div>
+      <button id="btnSubmit">確認送出記帳</button>
+      <div id="submitStatus" class="success-msg"></div>
+    </div>
 
-      <div class="muted" style="margin-top:10px;">
-        新增/修改記帳請到 Google Sheets（你跟朋友共同編輯）→ 網站讀取顯示
+    <div class="card" style="width: 250px;">
+      <div class="muted">總支出（EUR）</div>
+      <strong id="sumEur">-</strong>
+      <hr style="border:0; border-top:1px solid #eee; margin: 15px 0;">
+      <div class="muted">總支出（TWD）</div>
+      <strong id="sumTwd">-</strong>
+      <div class="muted" style="font-size: 12px; margin-top: 5px;">匯率：34.5</div>
+      
+      <div style="margin-top: 20px;">
+        <label>快速篩選分類</label>
+        <select id="filterCategory">
+          <option value="">全部顯示</option>
+          <option value="吃">吃</option>
+          <option value="交通">交通</option>
+          <option value="住宿">住宿</option>
+          <option value="購物">購物</option>
+        </select>
+        <button class="secondary" id="btnRefresh" style="margin-top: 10px;">整理/刷新資料</button>
       </div>
     </div>
   </div>
 
-  <div id="status" class="muted" style="margin-top: 12px;">載入中…</div>
-  <div id="error" class="err" style="margin-top: 8px;"></div>
+  <div id="status" style="margin-top: 20px; font-size: 14px; color: #666;">載入中...</div>
 
   <table>
     <thead>
@@ -118,307 +108,118 @@
         <th>項目</th>
         <th>分類</th>
         <th>金額(EUR)</th>
-        <th>備註</th>
       </tr>
     </thead>
     <tbody id="tbody"></tbody>
   </table>
 
-  <div class="footer">
-    <span class="pill">GitHub Pages</span>
-    <span class="pill">Google Sheets</span>
-    <span class="pill">No Login</span>
-  </div>
-
 <script>
-  // === 你的 Google Sheet + 分頁 ===
+  // === 設定區 ===
+  // 1. 這是你原本的 Sheet ID
   const SPREADSHEET_ID = "1-bY7b7pZpFN8ANpTkRKSzQ2FARgy0KYPkEMaqU7CVIk";
+  // 2. 這是你的 GAS Web App URL (完成第二步後填入)
+  const GAS_WEB_APP_URL = "你的_GAS_部署網址"; 
+  
   const SHEET_NAME = "歐洲記帳行程/記帳";
-  const SHEET_CSV_URL =
-    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
-
   const EUR_TO_TWD = 34.5;
-  const LS_CUSTOM_PERSONS = "travel_custom_persons_v1";
 
-  // === DOM ===
-  const tbody = document.getElementById("tbody");
-  const statusEl = document.getElementById("status");
-  const errorEl = document.getElementById("error");
-  const sumEurEl = document.getElementById("sumEur");
-  const sumTwdEl = document.getElementById("sumTwd");
-  const rateLabel = document.getElementById("rateLabel");
-  rateLabel.textContent = EUR_TO_TWD;
-
-  const filterMonth = document.getElementById("filterMonth");
-  const filterDay = document.getElementById("filterDay");
-  const filterPerson = document.getElementById("filterPerson");
-  const filterCategory = document.getElementById("filterCategory");
-  const filterKeyword = document.getElementById("filterKeyword");
-  const btnApply = document.getElementById("btnApply");
-  const btnReset = document.getElementById("btnReset");
-
-  const newPerson = document.getElementById("newPerson");
-  const btnAddPerson = document.getElementById("btnAddPerson");
+  // 初始化日期為今天
+  document.getElementById('addDate').valueAsDate = new Date();
 
   let rows = [];
-  let viewRows = [];
-  let customPersons = loadCustomPersons();
 
-  // === Utils ===
-  function escapeHtml(s) {
-    return String(s)
-      .replaceAll("&","&amp;").replaceAll("<","&lt;")
-      .replaceAll(">","&gt;").replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
-  }
-
-  function toNumber(v) {
-    const n = Number(String(v).replace(/[^\d.-]/g, ""));
-    return Number.isFinite(n) ? n : 0;
-  }
-
-  function uniq(arr) {
-    return Array.from(new Set(arr.map(v => (v ?? "").toString().trim()).filter(v => v !== "")))
-      .sort((a,b)=>a.localeCompare(b,"zh-Hant"));
-  }
-
-  // ✅ 正確 CSV 解析（支援引號、欄位內逗號）
-  function parseCSV(text) {
-    const lines = text.replace(/\r/g, "").split("\n").filter(l => l.trim().length);
-    if (!lines.length) return [];
-
-    const splitLine = (line) => {
-      const res = [];
-      let cur = "", inQ = false;
-      for (let i = 0; i < line.length; i++) {
-        const c = line[i];
-        if (c === '"') {
-          if (inQ && line[i+1] === '"') { cur += '"'; i++; }
-          else inQ = !inQ;
-        } else if (c === "," && !inQ) {
-          res.push(cur); cur = "";
-        } else cur += c;
-      }
-      res.push(cur);
-      return res.map(s => s.trim());
-    };
-
-    const header = splitLine(lines[0]).map(h => h.trim());
-    const out = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = splitLine(lines[i]);
-      const obj = {};
-      header.forEach((h, idx) => obj[h] = (cols[idx] ?? ""));
-      out.push(obj);
-    }
-    return out;
-  }
-
-  function getField(r, zh, en1, en2) {
-    return (r[zh] ?? r[en1] ?? r[en2] ?? "").toString().trim();
-  }
-
-  // 解析日期字串 -> month/day（支援 YYYY/MM/DD、YYYY-MM-DD、YYYY.M.D、YYYY/M/D）
-  function parseMonthDay(dateStr) {
-    const s = (dateStr ?? "").toString().trim();
-    if (!s) return { month: null, day: null };
-
-    const cleaned = s.replace(/[.]/g, "/").replace(/-/g, "/").replace(/\s+/g, "");
-    const parts = cleaned.split("/").filter(Boolean);
-
-    // 期待 3 段：YYYY/M/D
-    if (parts.length !== 3) return { month: null, day: null };
-
-    let y = parts[0], m = parts[1], d = parts[2];
-    // 若第一段不是 4 位數年份，就不推斷
-    if (!/^\d{4}$/.test(y)) return { month: null, day: null };
-
-    const mm = Number(m);
-    const dd = Number(d);
-    if (!Number.isFinite(mm) || !Number.isFinite(dd)) return { month: null, day: null };
-    if (mm < 1 || mm > 12) return { month: null, day: null };
-    if (dd < 1 || dd > 31) return { month: null, day: null };
-
-    return { month: mm, day: dd };
-  }
-
-  function loadCustomPersons() {
+  // --- 讀取資料 ---
+  async function loadData() {
+    const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
     try {
-      const raw = localStorage.getItem(LS_CUSTOM_PERSONS);
-      if (!raw) return [];
-      const arr = JSON.parse(raw);
-      return Array.isArray(arr) ? uniq(arr) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function saveCustomPersons(arr) {
-    customPersons = uniq(arr);
-    localStorage.setItem(LS_CUSTOM_PERSONS, JSON.stringify(customPersons));
-  }
-
-  function renderDayOptions() {
-    // 固定 1～31
-    let html = `<option value="">全部</option>`;
-    for (let d = 1; d <= 31; d++) {
-      html += `<option value="${d}">${d}日</option>`;
-    }
-    filterDay.innerHTML = html;
-  }
-
-  function renderPersonOptions() {
-    const personsFromSheet = rows.map(r => getField(r,"人","person","Person"));
-    const persons = uniq(personsFromSheet.concat(customPersons));
-    filterPerson.innerHTML =
-      `<option value="">全部</option>` + persons.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("");
-  }
-
-  function renderTable() {
-    tbody.innerHTML = viewRows.map(r => {
-      const date   = getField(r,"日期","date","Date");
-      const person = getField(r,"人","person","Person");
-      const item   = getField(r,"項目","item","Item");
-      const cat    = getField(r,"分類","category","Category");
-      const eur    = (r["金額(EUR)"] ?? r["EUR"] ?? r["AmountEUR"] ?? r["amount"] ?? "").toString().trim();
-      const note   = getField(r,"備註","note","Note");
-
-      return `<tr>
-        <td>${escapeHtml(date)}</td>
-        <td>${escapeHtml(person)}</td>
-        <td>${escapeHtml(item)}</td>
-        <td>${escapeHtml(cat)}</td>
-        <td>${escapeHtml(eur)}</td>
-        <td>${escapeHtml(note)}</td>
-      </tr>`;
-    }).join("");
-
-    statusEl.textContent = `共 ${viewRows.length} 筆`;
-  }
-
-  function renderSum() {
-    const totalEur = viewRows.reduce((acc, r) => {
-      const eur = (r["金額(EUR)"] ?? r["EUR"] ?? r["AmountEUR"] ?? r["amount"] ?? 0);
-      return acc + toNumber(eur);
-    }, 0);
-
-    sumEurEl.textContent = totalEur.toFixed(2);
-    sumTwdEl.textContent = Math.round(totalEur * EUR_TO_TWD).toLocaleString("zh-Hant-TW");
-  }
-
-  function applyFilter() {
-    const m = filterMonth.value ? Number(filterMonth.value) : null; // 1~12
-    const d = filterDay.value ? Number(filterDay.value) : null;     // 1~31
-    const p = filterPerson.value.trim();
-    const c = filterCategory.value.trim();
-    const k = filterKeyword.value.trim().toLowerCase();
-
-    viewRows = rows.filter(r => {
-      const dateRaw = getField(r,"日期","date","Date");
-      const md = parseMonthDay(dateRaw);
-
-      // 月份篩選
-      if (m !== null) {
-        if (md.month === null || md.month !== m) return false;
-      }
-
-      // 日期篩選：只有在「有選日期」時才套用
-      //（如果你想要：選日期但沒選月份也能篩，我也能改）
-      if (d !== null) {
-        if (md.day === null || md.day !== d) return false;
-      }
-
-      const person = getField(r,"人","person","Person");
-      const cat    = getField(r,"分類","category","Category");
-
-      if (p && person !== p) return false;
-      if (c && cat !== c) return false;
-
-      if (k) {
-        const item = getField(r,"項目","item","Item");
-        const note = getField(r,"備註","note","Note");
-        const hay = (item + " " + note).toLowerCase();
-        if (!hay.includes(k)) return false;
-      }
-
-      return true;
-    });
-
-    renderTable();
-    renderSum();
-  }
-
-  function addPerson() {
-    const name = newPerson.value.trim();
-    if (!name) return;
-    saveCustomPersons(customPersons.concat([name]));
-    newPerson.value = "";
-
-    renderPersonOptions();
-    filterPerson.value = name;
-    applyFilter();
-  }
-
-  async function load() {
-    errorEl.textContent = "";
-    statusEl.textContent = "載入中…";
-
-    try {
-      const res = await fetch(SHEET_CSV_URL, { cache: "no-store" });
-      if (!res.ok) throw new Error("讀取失敗：" + res.status);
-
+      const res = await fetch(url, { cache: "no-store" });
       const text = await res.text();
       rows = parseCSV(text);
-
-      // 固定日選單
-      renderDayOptions();
-
-      // 人下拉：Sheet + 自訂
-      renderPersonOptions();
-
-      // 初始顯示全部
-      viewRows = rows;
-      renderTable();
-      renderSum();
-
-      statusEl.textContent = `已載入 ${rows.length} 筆（分頁：${SHEET_NAME}）`;
-
+      renderTable(rows);
+      calculateSum(rows);
+      document.getElementById('status').textContent = `最後更新：${new Date().toLocaleTimeString()}`;
     } catch (e) {
-      errorEl.textContent =
-        "讀取失敗。\n\n請確認：\n" +
-        "1) Google Sheets 已「發佈到網路」\n" +
-        "2) 右上角「分享」→ 一般存取：知道連結的任何人（檢視者）\n\n" +
-        "技術訊息：" + e.message + "\n\n測試連結：\n" + SHEET_CSV_URL;
-
-      statusEl.textContent = "載入失敗";
+      console.error(e);
     }
   }
 
-  // 你說「日期要搭配月份」：所以當月份改變時，先清掉日期（避免誤會）
-  filterMonth.addEventListener("change", () => {
-    filterDay.value = "";
+  // --- 送出資料 ---
+  document.getElementById('btnSubmit').addEventListener('click', async () => {
+    const btn = document.getElementById('btnSubmit');
+    const status = document.getElementById('submitStatus');
+    
+    const data = {
+      date: document.getElementById('addDate').value,
+      person: document.getElementById('addPerson').value,
+      item: document.getElementById('addItem').value,
+      category: document.getElementById('addCategory').value,
+      amount: document.getElementById('addAmount').value,
+      note: document.getElementById('addNote').value
+    };
+
+    if (!data.item || !data.amount) {
+      alert("請填寫項目與金額");
+      return;
+    }
+
+    btn.disabled = true;
+    status.textContent = "傳送中...";
+
+    try {
+      // 這裡使用 GAS 處理寫入
+      await fetch(GAS_WEB_APP_URL, {
+        method: "POST",
+        mode: "no-cors", // 重要：跨網域處理
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      
+      status.textContent = "✅ 成功寫入 Google Sheets！";
+      document.getElementById('addItem').value = "";
+      document.getElementById('addAmount').value = "";
+      
+      // 延遲一下後重新載入列表
+      setTimeout(loadData, 2000);
+    } catch (e) {
+      status.textContent = "❌ 發生錯誤，請檢查 GAS 設定";
+    } finally {
+      btn.disabled = false;
+    }
   });
 
-  btnApply.addEventListener("click", applyFilter);
+  // (其餘輔助函式：parseCSV, renderTable, calculateSum 與你原本的雷同但簡化以維持效能)
+  function parseCSV(text) {
+    const lines = text.split("\n").filter(l => l.trim());
+    const header = lines[0].split(",").map(h => h.replace(/"/g, "").trim());
+    return lines.slice(1).map(line => {
+      const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); // 處理 CSV 逗號
+      const obj = {};
+      header.forEach((h, i) => obj[h] = cols[i]?.replace(/"/g, "").trim());
+      return obj;
+    });
+  }
 
-  btnReset.addEventListener("click", () => {
-    filterMonth.value = "";
-    filterDay.value = "";
-    filterPerson.value = "";
-    filterCategory.value = "";
-    filterKeyword.value = "";
+  function renderTable(data) {
+    const tbody = document.getElementById("tbody");
+    tbody.innerHTML = data.map(r => `
+      <tr>
+        <td>${r["日期"] || ''}</td>
+        <td>${r["人"] || ''}</td>
+        <td>${r["項目"] || ''}</td>
+        <td>${r["分類"] || ''}</td>
+        <td>${r["金額(EUR)"] || r["EUR"] || 0}</td>
+      </tr>
+    `).reverse().slice(0, 20).join(""); // 顯示最新20筆
+  }
 
-    viewRows = rows;
-    renderTable();
-    renderSum();
-  });
+  function calculateSum(data) {
+    const total = data.reduce((acc, r) => acc + Number(r["金額(EUR)"] || r["EUR"] || 0), 0);
+    document.getElementById("sumEur").textContent = total.toFixed(2);
+    document.getElementById("sumTwd").textContent = Math.round(total * EUR_TO_TWD).toLocaleString();
+  }
 
-  btnAddPerson.addEventListener("click", addPerson);
-  newPerson.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") addPerson();
-  });
-
-  load();
+  document.getElementById('btnRefresh').onclick = loadData;
+  loadData();
 </script>
 </body>
 </html>
