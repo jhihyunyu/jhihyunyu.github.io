@@ -15,6 +15,7 @@
     select, input { padding: 10px; border: 1px solid #ccc; border-radius: 10px; min-width: 180px; }
     button { padding: 10px 14px; border: 1px solid #111; background:#111; color:#fff; border-radius: 10px; cursor:pointer; }
     button.secondary { background:#fff; color:#111; }
+    button.ghost { background:#fff; color:#111; border:1px solid #ccc; }
     table { width:100%; border-collapse: collapse; margin-top: 14px; }
     th, td { padding: 10px; border-bottom: 1px solid #eee; text-align:left; vertical-align: top; }
     th { background: #fafafa; position: sticky; top: 0; z-index: 1; }
@@ -22,6 +23,9 @@
     .err { color: #b00020; white-space: pre-wrap; }
     .footer { margin-top: 18px; color:#777; font-size: 12px; }
     .pill { display:inline-block; padding: 4px 10px; border:1px solid #ddd; border-radius:999px; font-size:12px; color:#555; }
+    .mini { font-size: 12px; }
+    .stack { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
+    .inline { display:flex; gap:8px; align-items:center; }
   </style>
 </head>
 
@@ -40,29 +44,46 @@
       <div class="muted">匯率：1 EUR = <span id="rateLabel">34.5</span> TWD</div>
     </div>
 
-    <div class="card" style="flex: 1; min-width: 280px;">
-      <div class="row">
+    <div class="card" style="flex: 1; min-width: 320px;">
+      <div class="stack">
         <div>
-          <label>篩選：人</label>
-          <select id="filterPerson">
+          <label>時間（日期）</label>
+          <select id="filterDate">
             <option value="">全部</option>
           </select>
         </div>
+
         <div>
-          <label>篩選：分類</label>
+          <label>人</label>
+          <select id="filterPerson">
+            <option value="">全部</option>
+          </select>
+
+          <div class="inline" style="margin-top:8px;">
+            <input id="newPerson" placeholder="新增人名（例如：Ula）" />
+            <button class="ghost" id="btnAddPerson">新增</button>
+          </div>
+          <div class="muted mini">新增的人名只會存在你這台裝置（不會回寫到 Sheets）。</div>
+        </div>
+
+        <div>
+          <label>分類</label>
           <select id="filterCategory">
             <option value="">全部</option>
           </select>
         </div>
-        <div>
+
+        <div style="flex:1; min-width: 220px;">
           <label>關鍵字（項目/備註）</label>
           <input id="filterKeyword" placeholder="例如：咖啡 / 車票" />
         </div>
+
         <div style="display:flex; gap:10px;">
           <button id="btnApply">套用</button>
           <button class="secondary" id="btnReset">重設</button>
         </div>
       </div>
+
       <div class="muted" style="margin-top:10px;">
         新增/修改記帳請到 Google Sheets（你跟朋友共同編輯）→ 網站讀取顯示
       </div>
@@ -93,17 +114,17 @@
   </div>
 
 <script>
-  // === 固定設定：你的 Google Sheet + 分頁（已 URL encode）===
+  // === 固定設定：你的 Google Sheet + 分頁（可包含 / ，程式會自動 encode）===
   const SPREADSHEET_ID = "1-bY7b7pZpFN8ANpTkRKSzQ2FARgy0KYPkEMaqU7CVIk";
   const SHEET_NAME = "歐洲記帳行程/記帳";
-  const SHEET_NAME_ENCODED = encodeURIComponent(SHEET_NAME);
-
-  // gviz 方式輸出 csv，比 export?format=csv 更穩
   const SHEET_CSV_URL =
-    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAME_ENCODED}`;
+    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
 
-  // 旅行用匯率（可直接改）
+  // 旅行用匯率
   const EUR_TO_TWD = 34.5;
+
+  // === LocalStorage for custom persons ===
+  const LS_CUSTOM_PERSONS = "travel_custom_persons_v1";
 
   // === DOM ===
   const tbody = document.getElementById("tbody");
@@ -114,14 +135,19 @@
   const rateLabel = document.getElementById("rateLabel");
   rateLabel.textContent = EUR_TO_TWD;
 
+  const filterDate = document.getElementById("filterDate");
   const filterPerson = document.getElementById("filterPerson");
   const filterCategory = document.getElementById("filterCategory");
   const filterKeyword = document.getElementById("filterKeyword");
   const btnApply = document.getElementById("btnApply");
   const btnReset = document.getElementById("btnReset");
 
+  const newPerson = document.getElementById("newPerson");
+  const btnAddPerson = document.getElementById("btnAddPerson");
+
   let rows = [];
   let viewRows = [];
+  let customPersons = loadCustomPersons();
 
   // === Utils ===
   function escapeHtml(s) {
@@ -137,7 +163,7 @@
   }
 
   function uniq(arr) {
-    return Array.from(new Set(arr.filter(v => v !== "")))
+    return Array.from(new Set(arr.map(v => (v ?? "").toString().trim()).filter(v => v !== "")))
       .sort((a,b)=>a.localeCompare(b,"zh-Hant"));
   }
 
@@ -173,18 +199,45 @@
     return out;
   }
 
-  // 欄位容錯：讓你之後改英文欄名也能吃
   function getField(r, zh, en1, en2) {
     return (r[zh] ?? r[en1] ?? r[en2] ?? "").toString().trim();
   }
 
-  function renderFilters() {
-    const persons = uniq(rows.map(r => getField(r,"人","person","Person")));
-    const cats    = uniq(rows.map(r => getField(r,"分類","category","Category")));
+  function normalizeDate(s) {
+    // 保持原樣即可：你的下拉選單會直接用表格中的日期字串
+    return (s ?? "").toString().trim();
+  }
 
+  function loadCustomPersons() {
+    try {
+      const raw = localStorage.getItem(LS_CUSTOM_PERSONS);
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? uniq(arr) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveCustomPersons(arr) {
+    customPersons = uniq(arr);
+    localStorage.setItem(LS_CUSTOM_PERSONS, JSON.stringify(customPersons));
+  }
+
+  function renderFilters() {
+    // 日期下拉（時間）
+    const dates = uniq(rows.map(r => normalizeDate(getField(r,"日期","date","Date"))));
+    filterDate.innerHTML =
+      `<option value="">全部</option>` + dates.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join("");
+
+    // 人（Sheet 人 + 自己新增的人）
+    const personsFromSheet = rows.map(r => getField(r,"人","person","Person"));
+    const persons = uniq(personsFromSheet.concat(customPersons));
     filterPerson.innerHTML =
       `<option value="">全部</option>` + persons.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("");
 
+    // 分類
+    const cats = uniq(rows.map(r => getField(r,"分類","category","Category")));
     filterCategory.innerHTML =
       `<option value="">全部</option>` + cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
   }
@@ -222,16 +275,19 @@
   }
 
   function applyFilter() {
+    const d = filterDate.value.trim();
     const p = filterPerson.value.trim();
     const c = filterCategory.value.trim();
     const k = filterKeyword.value.trim().toLowerCase();
 
     viewRows = rows.filter(r => {
+      const date   = normalizeDate(getField(r,"日期","date","Date"));
       const person = getField(r,"人","person","Person");
       const cat    = getField(r,"分類","category","Category");
       const item   = getField(r,"項目","item","Item");
       const note   = getField(r,"備註","note","Note");
 
+      if (d && date !== d) return false;
       if (p && person !== p) return false;
       if (c && cat !== c) return false;
 
@@ -244,6 +300,18 @@
 
     renderTable();
     renderSum();
+  }
+
+  function addPerson() {
+    const name = newPerson.value.trim();
+    if (!name) return;
+    saveCustomPersons(customPersons.concat([name]));
+    newPerson.value = "";
+    // 重畫人下拉
+    renderFilters();
+    // 直接切到新的人，方便你用它篩選
+    filterPerson.value = name;
+    applyFilter();
   }
 
   async function load() {
@@ -268,11 +336,8 @@
       errorEl.textContent =
         "讀取失敗。\n\n請確認：\n" +
         "1) Google Sheets 已「發佈到網路」\n" +
-        "2) 右上角「分享」→ 一般存取：知道連結的任何人（檢視者）\n" +
-        "3) 分頁名稱正確（你的是：歐洲記帳行程/記帳）\n\n" +
-        "技術訊息：" + e.message + "\n\n" +
-        "你也可以直接用瀏覽器開這個測試連結：\n" +
-        SHEET_CSV_URL;
+        "2) 右上角「分享」→ 一般存取：知道連結的任何人（檢視者）\n\n" +
+        "技術訊息：" + e.message + "\n\n測試連結：\n" + SHEET_CSV_URL;
 
       statusEl.textContent = "載入失敗";
     }
@@ -280,12 +345,18 @@
 
   btnApply.addEventListener("click", applyFilter);
   btnReset.addEventListener("click", () => {
+    filterDate.value = "";
     filterPerson.value = "";
     filterCategory.value = "";
     filterKeyword.value = "";
     viewRows = rows;
     renderTable();
     renderSum();
+  });
+
+  btnAddPerson.addEventListener("click", addPerson);
+  newPerson.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") addPerson();
   });
 
   load();
