@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <title>歐洲旅遊小助手</title>
+  <title>歐洲旅遊助手</title>
   <style>
     :root {
       --primary-pink: #ffb7b2;
@@ -47,28 +47,18 @@
     .page.active { transform: translateX(0); }
     .page.prev { transform: translateX(-100%); }
 
-    /* 卡片樣式 */
+    /* 卡片與表單樣式 */
     .card { background: #fff; border-radius: 20px; padding: 18px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid rgba(255,183,178,0.1); }
+    label { font-size: 13px; color: #999; margin-bottom: 8px; display: block; }
+    input, select { width: 100%; padding: 12px; margin-bottom: 15px; border: 1.5px solid #f0f0f0; border-radius: 12px; font-size: 16px; background: #fafafa; }
+    button.btn-save { background: var(--primary-pink); color: white; border: none; border-radius: 15px; padding: 16px; font-size: 17px; font-weight: bold; width: 100%; box-shadow: 0 4px 0 #ff9aa2; }
     
     /* 行程專用樣式 */
     .date-divider { color: var(--primary-pink); font-weight: bold; margin: 20px 0 10px; display: flex; align-items: center; }
     .date-divider::after { content: ''; flex: 1; height: 1px; background: var(--warm-orange); margin-left: 10px; }
-    
-    .itinerary-card { border-left: 4px solid var(--soft-blue); padding-left: 15px; position: relative; }
-    .itinerary-time { font-size: 12px; color: var(--soft-blue); font-weight: bold; margin-bottom: 4px; }
-    .itinerary-title { font-size: 17px; font-weight: bold; color: var(--text-gray); margin-bottom: 6px; }
-    .itinerary-content { font-size: 14px; color: #888; line-height: 1.5; white-space: pre-wrap; }
-    
-    .map-btn {
-      display: inline-flex; align-items: center; background: #f0f7ff; color: #007aff;
-      padding: 6px 12px; border-radius: 10px; font-size: 12px; text-decoration: none; margin-top: 10px;
-    }
-    .map-btn::before { content: '📍'; margin-right: 4px; }
-
-    /* 記帳表單樣式 */
-    label { font-size: 13px; color: #999; margin-bottom: 8px; display: block; }
-    input, select { width: 100%; padding: 12px; margin-bottom: 15px; border: 1.5px solid #f0f0f0; border-radius: 12px; font-size: 16px; background: #fafafa; }
-    button.btn-save { background: var(--primary-pink); color: white; border: none; border-radius: 15px; padding: 16px; font-size: 17px; font-weight: bold; width: 100%; box-shadow: 0 4px 0 #ff9aa2; }
+    .itinerary-card { border-left: 4px solid var(--soft-blue); padding-left: 15px; }
+    .itinerary-title { font-size: 17px; font-weight: bold; color: var(--text-gray); margin-bottom: 4px; }
+    .map-btn { display: inline-flex; align-items: center; background: #f0f7ff; color: #007aff; padding: 6px 12px; border-radius: 10px; font-size: 12px; text-decoration: none; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -92,16 +82,35 @@
       <div class="card">
         <label>日期</label>
         <input type="date" id="addDate">
+        
+        <label>付錢的人</label>
+        <select id="addPerson">
+          <option value="U">U</option>
+          <option value="琳">琳</option>
+          <option value="黑">黑</option>
+          <option value="丹">丹</option>
+        </select>
+
         <label>項目名稱</label>
         <input type="text" id="addItem" placeholder="例如：由布院之森車票">
+        
         <div style="display:flex; gap:12px;">
-          <div style="flex:1"><label>金額(EUR)</label><input type="number" id="addAmount" placeholder="0.00" inputmode="decimal"></div>
-          <div style="flex:1"><label>分類</label>
+          <div style="flex:1">
+            <label>分類</label>
             <select id="addCategory">
-              <option>吃 🍕</option><option>交通 🎫</option><option>住宿 🏨</option><option>購物 🛍️</option><option>其他 ✨</option>
+              <option>吃 🍕</option>
+              <option>交通 🎫</option>
+              <option>住宿 🏨</option>
+              <option>購物 🛍️</option>
+              <option>其他 ✨</option>
             </select>
           </div>
+          <div style="flex:1">
+            <label>金額</label>
+            <input type="number" id="addAmount" placeholder="0.00" inputmode="decimal">
+          </div>
         </div>
+        
         <button class="btn-save" onclick="submitExpense()">儲存記帳</button>
         <div id="status-msg" style="text-align:center; margin-top:12px; font-size:13px; color:var(--primary-pink);"></div>
       </div>
@@ -112,14 +121,13 @@
     </div>
 
     <div id="page-2" class="page">
-      <div id="itinerary-content">正在讀取 Google Sheet 行程...</div>
+      <div id="itinerary-content">載入中...</div>
     </div>
   </div>
 
 <script>
   const SPREADSHEET_ID = "1-bY7b7pZpFN8ANpTkRKSzQ2FARgy0KYPkEMaqU7CVIk";
   const GAS_URL = "你的_GAS_部署網址"; 
-  const EUR_TO_TWD = 34.5;
 
   document.getElementById('addDate').valueAsDate = new Date();
 
@@ -133,7 +141,7 @@
     });
     tabs.forEach((t, i) => t.classList.toggle('active', i === index));
     
-    if(index === 1) loadData('歐洲記帳行程/記帳', renderHistory);
+    if(index === 1) loadData('記帳', renderHistory);
     if(index === 2) loadData('行程', renderItinerary);
   }
 
@@ -162,53 +170,72 @@
     const container = document.getElementById('history-content');
     let total = 0;
     const html = data.reverse().map(r => {
-      const amt = Number(r["金額(EUR)"] || r["EUR"] || 0);
+      const amt = Number(r["金額"] || 0);
       total += amt;
       return `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-        <div style="text-align:left"><b>${r["項目"]}</b><br><small style="color:#aaa">${r["日期"]} · ${r["分類"]}</small></div>
-        <div style="color:var(--primary-pink); font-weight:bold;">€${amt.toFixed(2)}</div>
+        <div style="text-align:left">
+          <b>${r["項目"]}</b> <small style="color:var(--primary-pink)">(${r["人"]})</small><br>
+          <small style="color:#aaa">${r["日期"]} · ${r["分類"]}</small>
+        </div>
+        <div style="color:var(--primary-pink); font-weight:bold;">$${amt.toFixed(2)}</div>
       </div>`;
     }).join("");
     container.innerHTML = `<div class="card" style="background:var(--warm-orange); color:#fff; text-align:center; border:none;">
-      <div style="font-size:12px; opacity:0.9">總預算消耗</div>
-      <div style="font-size:22px; font-weight:bold;">€${total.toFixed(2)}</div>
-      <div style="font-size:13px; opacity:0.9">約 NT$ ${Math.round(total*EUR_TO_TWD).toLocaleString()}</div>
+      <div style="font-size:12px; opacity:0.9">總計消耗</div>
+      <div style="font-size:22px; font-weight:bold;">$${total.toFixed(2)}</div>
     </div>` + html;
   }
 
-  // --- 重點：連動你的 Google Sheet 欄位 ---
   function renderItinerary(data) {
     const container = document.getElementById('itinerary-content');
     let currentDate = "";
     let html = "";
-
     data.forEach(r => {
-      // 檢查日期是否變換，增加日期分隔線
       if (r["日期"] && r["日期"] !== currentDate) {
         currentDate = r["日期"];
         html += `<div class="date-divider">${currentDate}</div>`;
       }
-
-      const time = r["時間"] || "";
-      const title = r["標題"] || "未設定活動";
-      const content = r["內容"] || "";
-      const mapKeyword = r["Google map keyword"] || "";
-
       html += `
         <div class="card itinerary-card">
-          ${time ? `<div class="itinerary-time">⏰ ${time}</div>` : ''}
-          <div class="itinerary-title">${title}</div>
-          ${content ? `<div class="itinerary-content">${content}</div>` : ''}
-          ${mapKeyword ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapKeyword)}" target="_blank" class="map-btn">在地圖中查看</a>` : ''}
-        </div>
-      `;
+          ${r["時間"] ? `<div style="font-size:12px; color:var(--soft-blue); font-weight:bold;">⏰ ${r["時間"]}</div>` : ''}
+          <div class="itinerary-title">${r["標題"]}</div>
+          ${r["內容"] ? `<div style="font-size:14px; color:#888; white-space:pre-wrap;">${r["內容"]}</div>` : ''}
+          ${r["Google map keyword"] ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r["Google map keyword"])}" target="_blank" class="map-btn">📍 地圖導航</a>` : ''}
+        </div>`;
     });
-
-    container.innerHTML = html || '<div class="card">目前沒有行程紀錄喔！</div>';
+    container.innerHTML = html || '<div class="card">目前沒有行程</div>';
   }
 
   async function submitExpense() {
-    // ... 原有的記帳送出邏輯 ...
+    const btn = document.querySelector('.btn-save');
+    const status = document.getElementById('status-msg');
+    const data = {
+      date: document.getElementById('addDate').value,
+      person: document.getElementById('addPerson').value,
+      item: document.getElementById('addItem').value,
+      category: document.getElementById('addCategory').value,
+      amount: document.getElementById('addAmount').value
+    };
+
+    if(!data.item || !data.amount) { alert("請填寫項目與金額"); return; }
+    btn.disabled = true;
+    status.innerText = "🚀 正在傳送資料...";
+
+    try {
+      await fetch(GAS_URL, {
+        method: "POST",
+        mode: "no-cors",
+        body: JSON.stringify(data)
+      });
+      status.innerText = "✅ 儲存成功！";
+      document.getElementById('addItem').value = "";
+      document.getElementById('addAmount').value = "";
+      setTimeout(() => { status.innerText = ""; }, 3000);
+    } catch(e) {
+      status.innerText = "❌ 失敗，請檢查網路或設定";
+    } finally {
+      btn.disabled = false;
+    }
   }
 </script>
 </body>
