@@ -126,6 +126,7 @@
   </div>
 
 <script>
+  // 請確保 SPREADSHEET_ID 和 GAS_URL 正確
   const SPREADSHEET_ID = "1-bY7b7pZpFN8ANpTkRKSzQ2FARgy0KYPkEMaqU7CVIk";
   const GAS_URL = "https://script.google.com/macros/s/AKfycbwE9dQuZ0TlCyW4d-FaybzNs-muTqUAuBCbML2ETJyurBpGs0yN0JsGPhqaoc8ILCUj/exec"; 
 
@@ -209,29 +210,51 @@
   async function submitExpense() {
     const btn = document.querySelector('.btn-save');
     const status = document.getElementById('status-msg');
-    const data = {
-      date: document.getElementById('addDate').value,
-      person: document.getElementById('addPerson').value,
-      item: document.getElementById('addItem').value,
-      category: document.getElementById('addCategory').value,
-      amount: document.getElementById('addAmount').value
-    };
+    
+    // 獲取輸入值
+    const date = document.getElementById('addDate').value;
+    const person = document.getElementById('addPerson').value;
+    const item = document.getElementById('addItem').value;
+    const category = document.getElementById('addCategory').value;
+    const amount = document.getElementById('addAmount').value;
 
-    if(!data.item || !data.amount) { alert("請填寫項目與金額"); return; }
+    if(!item || !amount) { alert("請填寫項目與金額"); return; }
+    
     btn.disabled = true;
     status.innerText = "🚀 正在傳送資料...";
 
+    // 關鍵修正：將資料轉為 URL 編碼格式以匹配後端的 e.parameter
+    const params = new URLSearchParams();
+    params.append('date', date);
+    params.append('person', person);
+    params.append('item', item);
+    params.append('category', category);
+    params.append('amount', amount);
+
     try {
+      // 使用 POST 傳送到 GAS
       await fetch(GAS_URL, {
         method: "POST",
-        mode: "no-cors",
-        body: JSON.stringify(data)
+        mode: "no-cors", // 必須保留此項以避開 CORS
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: params.toString()
       });
+
+      // 因為 no-cors 無法獲取回傳結果，我們直接假設成功
       status.innerText = "✅ 儲存成功！";
       document.getElementById('addItem').value = "";
       document.getElementById('addAmount').value = "";
-      setTimeout(() => { status.innerText = ""; }, 3000);
+      
+      // 1.5秒後清除提示並切換到紀錄頁面
+      setTimeout(() => { 
+        status.innerText = ""; 
+        switchTab(1); 
+      }, 1500);
+      
     } catch(e) {
+      console.error(e);
       status.innerText = "❌ 失敗，請檢查網路或設定";
     } finally {
       btn.disabled = false;
