@@ -14,7 +14,7 @@
     }
 
     * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background: var(--bg-color); }
+    html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background: var(--bg-color); scroll-behavior: smooth; }
     body { display: flex; flex-direction: column; font-family: -apple-system, "PingFang TC", sans-serif; }
 
     /* 上方導覽列 */
@@ -36,6 +36,19 @@
     }
     .tab-icon { font-size: 20px; margin-bottom: 2px; }
 
+    /* Day 快速導航列 (行程頁面專用) */
+    .day-nav {
+      display: flex; gap: 8px; overflow-x: auto; padding: 10px 15px; 
+      background: #fff; border-bottom: 1px solid #eee; sticky; top: 0; z-index: 10;
+      scrollbar-width: none; /* Firefox */
+    }
+    .day-nav::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+    .day-btn {
+      flex-shrink: 0; padding: 6px 15px; border-radius: 20px; background: #f5f5f5;
+      color: #777; font-size: 13px; font-weight: bold; cursor: pointer; border: none;
+    }
+    .day-btn:active { background: var(--soft-blue); color: #fff; }
+
     /* 內容區 */
     .content-area { flex: 1; position: relative; overflow: hidden; }
     .page {
@@ -51,11 +64,11 @@
     .card { background: #fff; border-radius: 20px; padding: 18px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid rgba(255,183,178,0.1); }
     label { font-size: 13px; color: #999; margin-bottom: 8px; display: block; }
     input, select { width: 100%; padding: 12px; margin-bottom: 15px; border: 1.5px solid #f0f0f0; border-radius: 12px; font-size: 16px; background: #fafafa; }
-    button.btn-save { background: var(--primary-pink); color: white; border: none; border-radius: 15px; padding: 16px; font-size: 17px; font-weight: bold; width: 100%; box-shadow: 0 4px 0 #ff9aa2; cursor: pointer; transition: 0.1s; }
+    button.btn-save { background: var(--primary-pink); color: white; border: none; border-radius: 15px; padding: 16px; font-size: 17px; font-weight: bold; width: 100%; box-shadow: 0 4px 0 #ff9aa2; cursor: pointer; }
     button.btn-save:active { transform: translateY(2px); box-shadow: 0 2px 0 #ff9aa2; }
     
     /* 行程專用樣式 */
-    .date-divider { color: var(--primary-pink); font-weight: bold; margin: 25px 0 12px; display: flex; align-items: center; font-size: 18px; }
+    .date-divider { color: var(--primary-pink); font-weight: bold; margin: 25px 0 12px; display: flex; align-items: center; font-size: 18px; scroll-margin-top: 110px; }
     .date-divider::after { content: ''; flex: 1; height: 1px; background: var(--warm-orange); margin-left: 10px; opacity: 0.5; }
     .itinerary-card { border-left: 5px solid var(--soft-blue); padding-left: 15px; }
     .itinerary-title { font-size: 17px; font-weight: bold; color: var(--text-gray); margin-bottom: 4px; }
@@ -83,58 +96,36 @@
       <div class="card">
         <label>日期</label>
         <input type="date" id="addDate">
-        
         <label>付錢的人</label>
-        <select id="addPerson">
-          <option value="U">U</option>
-          <option value="琳">琳</option>
-          <option value="黑">黑</option>
-          <option value="丹">丹</option>
-        </select>
-
+        <select id="addPerson"><option value="U">U</option><option value="琳">琳</option><option value="黑">黑</option><option value="丹">丹</option></select>
         <label>項目名稱</label>
-        <input type="text" id="addItem" placeholder="例如：由布院之森車票">
-        
+        <input type="text" id="addItem" placeholder="例如：晚餐">
         <div style="display:flex; gap:12px;">
-          <div style="flex:1">
-            <label>分類</label>
-            <select id="addCategory">
-              <option>吃 🍕</option>
-              <option>交通 🎫</option>
-              <option>住宿 🏨</option>
-              <option>購物 🛍️</option>
-              <option>其他 ✨</option>
-            </select>
+          <div style="flex:1"><label>分類</label>
+            <select id="addCategory"><option>吃 🍕</option><option>交通 🎫</option><option>住宿 🏨</option><option>購物 🛍️</option><option>其他 ✨</option></select>
           </div>
-          <div style="flex:1">
-            <label>金額</label>
+          <div style="flex:1"><label>金額</label>
             <input type="number" id="addAmount" placeholder="0.00" inputmode="decimal">
           </div>
         </div>
-        
         <button class="btn-save" onclick="submitExpense()">儲存記帳</button>
-        <div id="status-msg" style="text-align:center; margin-top:12px; font-size:13px; color:var(--primary-pink); min-height: 1.2em;"></div>
+        <div id="status-msg" style="text-align:center; margin-top:12px; font-size:13px; color:var(--primary-pink);"></div>
       </div>
     </div>
 
-    <div id="page-1" class="page">
-      <div id="history-content">載入中...</div>
-    </div>
+    <div id="page-1" class="page"><div id="history-content">載入中...</div></div>
 
-    <div id="page-2" class="page">
-      <div id="itinerary-content">載入中...</div>
+    <div id="page-2" class="page" style="padding-top: 0;">
+      <div id="day-nav-container" class="day-nav"></div> <div id="itinerary-content" style="padding: 20px;">載入中...</div>
     </div>
   </div>
 
 <script>
-  // 基礎設定
   const SPREADSHEET_ID = "1-bY7b7pZpFN8ANpTkRKSzQ2FARgy0KYPkEMaqU7CVIk";
   const GAS_URL = "https://script.google.com/macros/s/AKfycbwE9dQuZ0TlCyW4d-FaybzNs-muTqUAuBCbML2ETJyurBpGs0yN0JsGPhqaoc8ILCUj/exec"; 
 
-  // 初始化日期
   document.getElementById('addDate').valueAsDate = new Date();
 
-  // 頁籤切換
   function switchTab(index) {
     const pages = document.querySelectorAll('.page');
     const tabs = document.querySelectorAll('.tab-item');
@@ -144,25 +135,19 @@
       else if(i < index) p.classList.add('prev');
     });
     tabs.forEach((t, i) => t.classList.toggle('active', i === index));
-    
     if(index === 1) loadData('記帳', renderHistory);
     if(index === 2) loadData('行程', renderItinerary);
   }
 
-  // 從 Google Sheet 抓取 CSV 資料
   async function loadData(sheetName, callback) {
     const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
     try {
       const res = await fetch(url, { cache: "no-store" });
       const text = await res.text();
       callback(parseCSV(text));
-    } catch (e) { 
-      console.error(e);
-      document.getElementById(sheetName === '記帳' ? 'history-content' : 'itinerary-content').innerText = "連線失敗，請檢查網路";
-    }
+    } catch (e) { console.error(e); }
   }
 
-  // CSV 解析器 (處理逗號與引號)
   function parseCSV(text) {
     const lines = text.split("\n").filter(l => l.trim());
     if (!lines.length) return [];
@@ -175,7 +160,6 @@
     });
   }
 
-  // 渲染記帳歷史
   function renderHistory(data) {
     const container = document.getElementById('history-content');
     let total = 0;
@@ -183,34 +167,24 @@
       const amt = parseFloat(r["金額"] || 0);
       total += amt;
       return `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-        <div style="text-align:left">
-          <b style="color:var(--text-gray)">${r["項目"] || "未命名"}</b> <small style="color:var(--primary-pink)">(${r["人"]})</small><br>
-          <small style="color:#aaa">${r["日期"]} · ${r["分類"]}</small>
-        </div>
-        <div style="color:var(--primary-pink); font-weight:bold; font-size:18px;">$${amt.toFixed(2)}</div>
+        <div style="text-align:left"><b>${r["項目"]}</b> <small style="color:var(--primary-pink)">(${r["人"]})</small><br>
+        <small style="color:#aaa">${r["日期"]}</small></div>
+        <div style="color:var(--primary-pink); font-weight:bold;">$${amt.toFixed(2)}</div>
       </div>`;
     }).join("");
-
-    container.innerHTML = `
-      <div class="card" style="background:linear-gradient(135deg, var(--primary-pink), var(--warm-orange)); color:#fff; text-align:center; border:none;">
-        <div style="font-size:13px; opacity:0.9">目前總支出</div>
-        <div style="font-size:28px; font-weight:bold;">$${total.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-      </div>` + html;
+    container.innerHTML = `<div class="card" style="background:var(--warm-orange); color:#fff; text-align:center; border:none;">總支出 $${total.toFixed(2)}</div>` + html;
   }
 
-  // 渲染行程 (連動 Day, 日期, 時間, 標題, 內容, Google map)
+  // --- 重點更新：行程渲染與 Day 跳轉按鈕 ---
   function renderItinerary(data) {
     const container = document.getElementById('itinerary-content');
+    const navContainer = document.getElementById('day-nav-container');
     let currentDayLabel = "";
     let html = "";
+    let navHtml = "";
+    let dayList = [];
 
-    if (!data || data.length === 0) {
-      container.innerHTML = '<div class="card">📭 目前還沒有行程規劃喔</div>';
-      return;
-    }
-
-    data.forEach(r => {
-      // 連動 Day (A欄) 與 日期 (B欄) 做分隔標記
+    data.forEach((r, index) => {
       const day = r["Day"] || "";
       const date = r["日期"] || "";
       const time = r["時間"] || "";
@@ -218,68 +192,55 @@
       const content = r["內容"] || "";
       const mapKey = r["Google map"] || "";
 
+      // 建立 Day 分隔線與導航 ID
       if (day && day !== currentDayLabel) {
         currentDayLabel = day;
-        html += `<div class="date-divider">${day} <span style="font-size:14px; font-weight:normal; margin-left:8px; opacity:0.7;">${date}</span></div>`;
+        dayList.push(day);
+        const dayID = `day-target-${day}`;
+        html += `<div id="${dayID}" class="date-divider">${day} <span style="font-size:14px; font-weight:normal; margin-left:8px; opacity:0.7;">${date}</span></div>`;
       }
 
       html += `
         <div class="card itinerary-card">
-          ${time ? `<div style="font-size:12px; color:var(--soft-blue); font-weight:bold; margin-bottom:4px;">⏰ ${time}</div>` : ''}
+          ${time ? `<div style="font-size:12px; color:var(--soft-blue); font-weight:bold;">⏰ ${time}</div>` : ''}
           <div class="itinerary-title">${title}</div>
-          ${content ? `<div style="font-size:14px; color:#888; white-space:pre-wrap; margin-top:6px; line-height:1.5;">${content}</div>` : ''}
-          ${mapKey ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapKey)}" target="_blank" class="map-btn">📍 地圖導航：${mapKey}</a>` : ''}
+          ${content ? `<div style="font-size:14px; color:#888; white-space:pre-wrap; margin-top:5px;">${content}</div>` : ''}
+          ${mapKey ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapKey)}" target="_blank" class="map-btn">📍 地圖：${mapKey}</a>` : ''}
         </div>`;
     });
-    container.innerHTML = html;
+
+    // 生成頂部按鈕
+    navHtml = dayList.map(d => `<button class="day-btn" onclick="scrollToDay('${d}')">${d}</button>`).join("");
+    navContainer.innerHTML = navHtml;
+    container.innerHTML = html || '<div class="card">暫無行程</div>';
   }
 
-  // 提交記帳資料
+  // 平滑捲動至指定 Day
+  function scrollToDay(day) {
+    const target = document.getElementById(`day-target-${day}`);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
   async function submitExpense() {
     const btn = document.querySelector('.btn-save');
     const status = document.getElementById('status-msg');
-    
-    const date = document.getElementById('addDate').value;
-    const person = document.getElementById('addPerson').value;
-    const item = document.getElementById('addItem').value;
-    const category = document.getElementById('addCategory').value;
-    const amount = document.getElementById('addAmount').value;
+    const params = new URLSearchParams();
+    params.append('date', document.getElementById('addDate').value);
+    params.append('person', document.getElementById('addPerson').value);
+    params.append('item', document.getElementById('addItem').value);
+    params.append('category', document.getElementById('addCategory').value);
+    params.append('amount', document.getElementById('addAmount').value);
 
-    if(!item || !amount) { alert("請填寫項目與金額"); return; }
-    
     btn.disabled = true;
     status.innerText = "🚀 傳送中...";
-
-    const params = new URLSearchParams();
-    params.append('date', date);
-    params.append('person', person);
-    params.append('item', item);
-    params.append('category', category);
-    params.append('amount', amount);
-
     try {
-      await fetch(GAS_URL, {
-        method: "POST",
-        mode: "no-cors", 
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: params.toString()
-      });
-
+      await fetch(GAS_URL, { method: "POST", mode: "no-cors", body: params.toString() });
       status.innerText = "✅ 儲存成功！";
-      document.getElementById('addItem').value = "";
-      document.getElementById('addAmount').value = "";
-      
-      setTimeout(() => { 
-        status.innerText = ""; 
-        switchTab(1); 
-      }, 1000);
-      
-    } catch(e) {
-      console.error(e);
-      status.innerText = "❌ 失敗，請檢查設定";
-    } finally {
-      btn.disabled = false;
-    }
+      setTimeout(() => { status.innerText = ""; switchTab(1); }, 1000);
+    } catch(e) { status.innerText = "❌ 失敗"; }
+    btn.disabled = false;
   }
 </script>
 </body>
