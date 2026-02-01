@@ -46,7 +46,6 @@
     .day-btn {
       flex-shrink: 0; padding: 8px 18px; border-radius: 12px; background: #f8f8f8;
       color: #999; font-size: 14px; font-weight: bold; cursor: pointer; border: 1px solid #eee;
-      transition: 0.2s;
     }
     .day-btn.active { background: var(--primary-pink); color: #fff; border-color: var(--primary-pink); box-shadow: 0 4px 10px rgba(255,183,178,0.3); }
 
@@ -61,17 +60,26 @@
     .page.prev { transform: translateX(-100%); }
 
     /* 行程顯示邏輯 */
-    .day-content-group { display: none; } /* 預設隱藏所有天數 */
-    .day-content-group.active { display: block; animation: fadeIn 0.3s ease; } /* 只顯示 active 的天 */
+    .day-content-group { display: none; }
+    .day-content-group.active { display: block; animation: fadeIn 0.3s ease; }
 
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* 卡片樣式 */
+    /* 卡片與按鈕樣式 */
     .card { background: #fff; border-radius: 20px; padding: 18px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid rgba(255,183,178,0.1); }
     .itinerary-card { border-left: 5px solid var(--soft-blue); }
     .itinerary-title { font-size: 17px; font-weight: bold; color: var(--text-gray); }
-    .map-btn { display: inline-flex; align-items: center; background: #f0f7ff; color: #007aff; padding: 8px 14px; border-radius: 10px; font-size: 13px; text-decoration: none; margin-top: 10px; font-weight: 500; }
     
+    .map-btn { 
+      display: inline-flex; align-items: center; 
+      background: #f0f7ff; color: #007aff; 
+      padding: 10px 16px; border-radius: 12px; 
+      font-size: 14px; text-decoration: none; 
+      margin-top: 12px; font-weight: bold;
+      border: 1px solid rgba(0,122,255,0.1);
+    }
+    .map-btn:active { background: #e0eeff; }
+
     /* 記帳輸入樣式 */
     label { font-size: 13px; color: #999; margin-bottom: 8px; display: block; }
     input, select { width: 100%; padding: 12px; margin-bottom: 15px; border: 1.5px solid #f0f0f0; border-radius: 12px; font-size: 16px; background: #fafafa; }
@@ -93,7 +101,7 @@
       <div class="card">
         <label>日期</label><input type="date" id="addDate">
         <label>付錢的人</label><select id="addPerson"><option>U</option><option>琳</option><option>黑</option><option>丹</option></select>
-        <label>項目名稱</label><input type="text" id="addItem" placeholder="例如：由布院車票">
+        <label>項目名稱</label><input type="text" id="addItem" placeholder="例如：晚餐">
         <div style="display:flex; gap:12px;">
           <div style="flex:1"><label>分類</label><select id="addCategory"><option>吃 🍕</option><option>交通 🎫</option><option>住宿 🏨</option><option>購物 🛍️</option></select></div>
           <div style="flex:1"><label>金額</label><input type="number" id="addAmount" placeholder="0.00" inputmode="decimal"></div>
@@ -166,13 +174,12 @@
     container.innerHTML = `<div class="card" style="background:var(--warm-orange); color:#fff; text-align:center; border:none;">總支出 $${total.toFixed(2)}</div>` + html;
   }
 
-  // --- 行程分頁邏輯更新 ---
   function renderItinerary(data) {
     const container = document.getElementById('itinerary-content');
     const navContainer = document.getElementById('day-nav-container');
     let html = "";
     let navHtml = "";
-    let dayGroups = {}; // 用來存放每一天的資料
+    let dayGroups = {};
 
     data.forEach(r => {
       const day = r["Day"] || "Unknown";
@@ -181,22 +188,31 @@
     });
 
     const dayKeys = Object.keys(dayGroups);
-
     dayKeys.forEach((day, index) => {
-      // 生成按鈕
       navHtml += `<button id="btn-${day}" class="day-btn ${index === 0 ? 'active' : ''}" onclick="showDayPage('${day}')">${day}</button>`;
-
-      // 生成該天的行程內容區塊
       html += `<div id="content-${day}" class="day-content-group ${index === 0 ? 'active' : ''}">`;
       html += `<div style="color:var(--primary-pink); font-weight:bold; margin-bottom:15px; font-size:14px;">📅 ${dayGroups[day].date}</div>`;
       
       dayGroups[day].items.forEach(item => {
+        // --- 修正後的 Google Map 連結邏輯 ---
+        let mapLink = "";
+        const mapVal = item["Google map"] ? item["Google map"].trim() : "";
+        
+        if (mapVal) {
+          // 如果填寫的是網址，直接用；如果是文字，生成搜尋網址
+          if (mapVal.startsWith("http")) {
+            mapLink = mapVal;
+          } else {
+            mapLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapVal)}`;
+          }
+        }
+
         html += `
           <div class="card itinerary-card">
             ${item["時間"] ? `<div style="font-size:12px; color:var(--soft-blue); font-weight:bold;">⏰ ${item["時間"]}</div>` : ''}
             <div class="itinerary-title">${item["標題"]}</div>
             ${item["內容"] ? `<div style="font-size:14px; color:#888; white-space:pre-wrap; margin-top:5px;">${item["內容"]}</div>` : ''}
-            ${item["Google map"] ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item["Google map"])}" target="_blank" class="map-btn">📍 地圖：${item["Google map"]}</a>` : ''}
+            ${mapLink ? `<a href="${mapLink}" target="_blank" class="map-btn">📍 前往地圖</a>` : ''}
           </div>`;
       });
       html += `</div>`;
@@ -206,17 +222,11 @@
     container.innerHTML = html || '<div class="card">暫無行程</div>';
   }
 
-  // 切換顯示特定天數
   function showDayPage(dayId) {
-    // 切換按鈕樣式
     document.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('active'));
     document.getElementById(`btn-${dayId}`).classList.add('active');
-
-    // 切換內容顯示
     document.querySelectorAll('.day-content-group').forEach(group => group.classList.remove('active'));
     document.getElementById(`content-${dayId}`).classList.add('active');
-    
-    // 捲動回頂部
     document.getElementById('itinerary-content').scrollTop = 0;
   }
 
