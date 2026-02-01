@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <title>歐洲行程助手 🗺️</title>
+  <title>2026德奧捷小U旅行團 ✈️</title>
   <style>
     :root {
       --primary-pink: #ffb7b2;
@@ -17,16 +17,17 @@
     html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background: var(--bg-color); }
     body { display: flex; flex-direction: column; font-family: -apple-system, "PingFang TC", "Helvetica Neue", sans-serif; }
 
-    /* 上方標題列 */
+    /* 上方標題列 - 已更新為 2026德奧捷小U旅行團 */
     .header-title {
       background: #fff;
       padding: env(safe-area-inset-top) 20px 15px;
       text-align: center;
-      font-weight: bold;
-      font-size: 20px;
+      font-weight: 900;
+      font-size: 22px;
       color: var(--text-gray);
       box-shadow: 0 2px 10px rgba(0,0,0,0.05);
       z-index: 100;
+      letter-spacing: 1px;
     }
 
     /* Day 分頁導覽列 */
@@ -77,7 +78,7 @@
 </head>
 <body>
 
-  <div class="header-title">My Travel Itinerary</div>
+  <div class="header-title">2026德奧捷小U旅行團</div>
 
   <div id="day-nav-container" class="day-nav"></div>
 
@@ -86,10 +87,8 @@
   </div>
 
 <script>
-  // 請填入你的 Spreadsheet ID
   const SPREADSHEET_ID = "1-bY7b7pZpFN8ANpTkRKSzQ2FARgy0KYPkEMaqU7CVIk";
 
-  // 初始化自動載入
   window.onload = () => loadItineraryData();
 
   async function loadItineraryData() {
@@ -123,7 +122,6 @@
     let navHtml = "";
     let dayGroups = {};
 
-    // 整理資料按 Day 分類
     data.forEach(r => {
       const day = r["Day"] || "Day";
       if (!dayGroups[day]) dayGroups[day] = { date: r["日期"], items: [] };
@@ -137,15 +135,12 @@
     }
 
     dayKeys.forEach((day, index) => {
-      // 頂部 Day 按鈕
       navHtml += `<button id="btn-${day}" class="day-btn ${index === 0 ? 'active' : ''}" onclick="showDayPage('${day}')">${day}</button>`;
 
-      // 該 Day 的行程區塊
       html += `<div id="content-${day}" class="day-content-group ${index === 0 ? 'active' : ''}">`;
       html += `<div style="color:var(--primary-pink); font-weight:bold; margin-bottom:20px; font-size:15px; text-align:center;">🗓️ ${dayGroups[day].date || ''}</div>`;
       
       dayGroups[day].items.forEach(item => {
-        // 生成地圖連結
         let mapLink = "";
         const mapVal = item["Google map"] ? item["Google map"].trim() : "";
         if (mapVal) {
@@ -168,15 +163,10 @@
   }
 
   function showDayPage(dayId) {
-    // 切換按鈕樣式
     document.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('active'));
     document.getElementById(`btn-${dayId}`).classList.add('active');
-
-    // 切換內容顯示
     document.querySelectorAll('.day-content-group').forEach(group => group.classList.remove('active'));
     document.getElementById(`content-${dayId}`).classList.add('active');
-    
-    // 置頂
     document.getElementById('itinerary-content').scrollTop = 0;
   }
 </script>
