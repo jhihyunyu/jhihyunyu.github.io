@@ -51,14 +51,15 @@
     .card { background: #fff; border-radius: 20px; padding: 18px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid rgba(255,183,178,0.1); }
     label { font-size: 13px; color: #999; margin-bottom: 8px; display: block; }
     input, select { width: 100%; padding: 12px; margin-bottom: 15px; border: 1.5px solid #f0f0f0; border-radius: 12px; font-size: 16px; background: #fafafa; }
-    button.btn-save { background: var(--primary-pink); color: white; border: none; border-radius: 15px; padding: 16px; font-size: 17px; font-weight: bold; width: 100%; box-shadow: 0 4px 0 #ff9aa2; }
+    button.btn-save { background: var(--primary-pink); color: white; border: none; border-radius: 15px; padding: 16px; font-size: 17px; font-weight: bold; width: 100%; box-shadow: 0 4px 0 #ff9aa2; cursor: pointer; transition: 0.1s; }
+    button.btn-save:active { transform: translateY(2px); box-shadow: 0 2px 0 #ff9aa2; }
     
     /* 行程專用樣式 */
-    .date-divider { color: var(--primary-pink); font-weight: bold; margin: 20px 0 10px; display: flex; align-items: center; }
-    .date-divider::after { content: ''; flex: 1; height: 1px; background: var(--warm-orange); margin-left: 10px; }
-    .itinerary-card { border-left: 4px solid var(--soft-blue); padding-left: 15px; }
+    .date-divider { color: var(--primary-pink); font-weight: bold; margin: 25px 0 12px; display: flex; align-items: center; font-size: 18px; }
+    .date-divider::after { content: ''; flex: 1; height: 1px; background: var(--warm-orange); margin-left: 10px; opacity: 0.5; }
+    .itinerary-card { border-left: 5px solid var(--soft-blue); padding-left: 15px; }
     .itinerary-title { font-size: 17px; font-weight: bold; color: var(--text-gray); margin-bottom: 4px; }
-    .map-btn { display: inline-flex; align-items: center; background: #f0f7ff; color: #007aff; padding: 6px 12px; border-radius: 10px; font-size: 12px; text-decoration: none; margin-top: 10px; }
+    .map-btn { display: inline-flex; align-items: center; background: #f0f7ff; color: #007aff; padding: 8px 14px; border-radius: 12px; font-size: 13px; text-decoration: none; margin-top: 12px; font-weight: 500; border: 1px solid rgba(0,122,255,0.1); }
   </style>
 </head>
 <body>
@@ -112,7 +113,7 @@
         </div>
         
         <button class="btn-save" onclick="submitExpense()">儲存記帳</button>
-        <div id="status-msg" style="text-align:center; margin-top:12px; font-size:13px; color:var(--primary-pink);"></div>
+        <div id="status-msg" style="text-align:center; margin-top:12px; font-size:13px; color:var(--primary-pink); min-height: 1.2em;"></div>
       </div>
     </div>
 
@@ -126,12 +127,14 @@
   </div>
 
 <script>
-  // 請確保 SPREADSHEET_ID 和 GAS_URL 正確
+  // 基礎設定
   const SPREADSHEET_ID = "1-bY7b7pZpFN8ANpTkRKSzQ2FARgy0KYPkEMaqU7CVIk";
   const GAS_URL = "https://script.google.com/macros/s/AKfycbwE9dQuZ0TlCyW4d-FaybzNs-muTqUAuBCbML2ETJyurBpGs0yN0JsGPhqaoc8ILCUj/exec"; 
 
+  // 初始化日期
   document.getElementById('addDate').valueAsDate = new Date();
 
+  // 頁籤切換
   function switchTab(index) {
     const pages = document.querySelectorAll('.page');
     const tabs = document.querySelectorAll('.tab-item');
@@ -146,15 +149,20 @@
     if(index === 2) loadData('行程', renderItinerary);
   }
 
+  // 從 Google Sheet 抓取 CSV 資料
   async function loadData(sheetName, callback) {
     const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
     try {
       const res = await fetch(url, { cache: "no-store" });
       const text = await res.text();
       callback(parseCSV(text));
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      console.error(e);
+      document.getElementById(sheetName === '記帳' ? 'history-content' : 'itinerary-content').innerText = "連線失敗，請檢查網路";
+    }
   }
 
+  // CSV 解析器 (處理逗號與引號)
   function parseCSV(text) {
     const lines = text.split("\n").filter(l => l.trim());
     if (!lines.length) return [];
@@ -167,51 +175,70 @@
     });
   }
 
+  // 渲染記帳歷史
   function renderHistory(data) {
     const container = document.getElementById('history-content');
     let total = 0;
     const html = data.reverse().map(r => {
-      const amt = Number(r["金額"] || 0);
+      const amt = parseFloat(r["金額"] || 0);
       total += amt;
       return `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
         <div style="text-align:left">
-          <b>${r["項目"]}</b> <small style="color:var(--primary-pink)">(${r["人"]})</small><br>
+          <b style="color:var(--text-gray)">${r["項目"] || "未命名"}</b> <small style="color:var(--primary-pink)">(${r["人"]})</small><br>
           <small style="color:#aaa">${r["日期"]} · ${r["分類"]}</small>
         </div>
-        <div style="color:var(--primary-pink); font-weight:bold;">$${amt.toFixed(2)}</div>
+        <div style="color:var(--primary-pink); font-weight:bold; font-size:18px;">$${amt.toFixed(2)}</div>
       </div>`;
     }).join("");
-    container.innerHTML = `<div class="card" style="background:var(--warm-orange); color:#fff; text-align:center; border:none;">
-      <div style="font-size:12px; opacity:0.9">總計消耗</div>
-      <div style="font-size:22px; font-weight:bold;">$${total.toFixed(2)}</div>
-    </div>` + html;
+
+    container.innerHTML = `
+      <div class="card" style="background:linear-gradient(135deg, var(--primary-pink), var(--warm-orange)); color:#fff; text-align:center; border:none;">
+        <div style="font-size:13px; opacity:0.9">目前總支出</div>
+        <div style="font-size:28px; font-weight:bold;">$${total.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+      </div>` + html;
   }
 
+  // 渲染行程 (連動 Day, 日期, 時間, 標題, 內容, Google map)
   function renderItinerary(data) {
     const container = document.getElementById('itinerary-content');
-    let currentDate = "";
+    let currentDayLabel = "";
     let html = "";
+
+    if (!data || data.length === 0) {
+      container.innerHTML = '<div class="card">📭 目前還沒有行程規劃喔</div>';
+      return;
+    }
+
     data.forEach(r => {
-      if (r["日期"] && r["日期"] !== currentDate) {
-        currentDate = r["日期"];
-        html += `<div class="date-divider">${currentDate}</div>`;
+      // 連動 Day (A欄) 與 日期 (B欄) 做分隔標記
+      const day = r["Day"] || "";
+      const date = r["日期"] || "";
+      const time = r["時間"] || "";
+      const title = r["標題"] || "";
+      const content = r["內容"] || "";
+      const mapKey = r["Google map"] || "";
+
+      if (day && day !== currentDayLabel) {
+        currentDayLabel = day;
+        html += `<div class="date-divider">${day} <span style="font-size:14px; font-weight:normal; margin-left:8px; opacity:0.7;">${date}</span></div>`;
       }
+
       html += `
         <div class="card itinerary-card">
-          ${r["時間"] ? `<div style="font-size:12px; color:var(--soft-blue); font-weight:bold;">⏰ ${r["時間"]}</div>` : ''}
-          <div class="itinerary-title">${r["標題"]}</div>
-          ${r["內容"] ? `<div style="font-size:14px; color:#888; white-space:pre-wrap;">${r["內容"]}</div>` : ''}
-          ${r["Google map keyword"] ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r["Google map keyword"])}" target="_blank" class="map-btn">📍 地圖導航</a>` : ''}
+          ${time ? `<div style="font-size:12px; color:var(--soft-blue); font-weight:bold; margin-bottom:4px;">⏰ ${time}</div>` : ''}
+          <div class="itinerary-title">${title}</div>
+          ${content ? `<div style="font-size:14px; color:#888; white-space:pre-wrap; margin-top:6px; line-height:1.5;">${content}</div>` : ''}
+          ${mapKey ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapKey)}" target="_blank" class="map-btn">📍 地圖導航：${mapKey}</a>` : ''}
         </div>`;
     });
-    container.innerHTML = html || '<div class="card">目前沒有行程</div>';
+    container.innerHTML = html;
   }
 
+  // 提交記帳資料
   async function submitExpense() {
     const btn = document.querySelector('.btn-save');
     const status = document.getElementById('status-msg');
     
-    // 獲取輸入值
     const date = document.getElementById('addDate').value;
     const person = document.getElementById('addPerson').value;
     const item = document.getElementById('addItem').value;
@@ -221,9 +248,8 @@
     if(!item || !amount) { alert("請填寫項目與金額"); return; }
     
     btn.disabled = true;
-    status.innerText = "🚀 正在傳送資料...";
+    status.innerText = "🚀 傳送中...";
 
-    // 關鍵修正：將資料轉為 URL 編碼格式以匹配後端的 e.parameter
     const params = new URLSearchParams();
     params.append('date', date);
     params.append('person', person);
@@ -232,30 +258,25 @@
     params.append('amount', amount);
 
     try {
-      // 使用 POST 傳送到 GAS
       await fetch(GAS_URL, {
         method: "POST",
-        mode: "no-cors", // 必須保留此項以避開 CORS
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
+        mode: "no-cors", 
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: params.toString()
       });
 
-      // 因為 no-cors 無法獲取回傳結果，我們直接假設成功
       status.innerText = "✅ 儲存成功！";
       document.getElementById('addItem').value = "";
       document.getElementById('addAmount').value = "";
       
-      // 1.5秒後清除提示並切換到紀錄頁面
       setTimeout(() => { 
         status.innerText = ""; 
         switchTab(1); 
-      }, 1500);
+      }, 1000);
       
     } catch(e) {
       console.error(e);
-      status.innerText = "❌ 失敗，請檢查網路或設定";
+      status.innerText = "❌ 失敗，請檢查設定";
     } finally {
       btn.disabled = false;
     }
