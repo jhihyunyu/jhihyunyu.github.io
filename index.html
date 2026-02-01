@@ -14,7 +14,7 @@
     }
 
     * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background: var(--bg-color); scroll-behavior: smooth; }
+    html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background: var(--bg-color); }
     body { display: flex; flex-direction: column; font-family: -apple-system, "PingFang TC", sans-serif; }
 
     /* 上方導覽列 */
@@ -36,18 +36,19 @@
     }
     .tab-icon { font-size: 20px; margin-bottom: 2px; }
 
-    /* Day 快速導航列 (行程頁面專用) */
+    /* Day 分頁導覽列 */
     .day-nav {
-      display: flex; gap: 8px; overflow-x: auto; padding: 10px 15px; 
-      background: #fff; border-bottom: 1px solid #eee; sticky; top: 0; z-index: 10;
-      scrollbar-width: none; /* Firefox */
+      display: flex; gap: 8px; overflow-x: auto; padding: 12px 15px; 
+      background: #fff; border-bottom: 1px solid #f0f0f0; flex-shrink: 0;
+      scrollbar-width: none;
     }
-    .day-nav::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+    .day-nav::-webkit-scrollbar { display: none; }
     .day-btn {
-      flex-shrink: 0; padding: 6px 15px; border-radius: 20px; background: #f5f5f5;
-      color: #777; font-size: 13px; font-weight: bold; cursor: pointer; border: none;
+      flex-shrink: 0; padding: 8px 18px; border-radius: 12px; background: #f8f8f8;
+      color: #999; font-size: 14px; font-weight: bold; cursor: pointer; border: 1px solid #eee;
+      transition: 0.2s;
     }
-    .day-btn:active { background: var(--soft-blue); color: #fff; }
+    .day-btn.active { background: var(--primary-pink); color: #fff; border-color: var(--primary-pink); box-shadow: 0 4px 10px rgba(255,183,178,0.3); }
 
     /* 內容區 */
     .content-area { flex: 1; position: relative; overflow: hidden; }
@@ -55,58 +56,47 @@
       position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
       overflow-y: auto; padding: 20px; box-sizing: border-box;
       transition: transform 0.3s ease-out; transform: translateX(100%);
-      -webkit-overflow-scrolling: touch;
     }
     .page.active { transform: translateX(0); }
     .page.prev { transform: translateX(-100%); }
 
-    /* 卡片與表單樣式 */
+    /* 行程顯示邏輯 */
+    .day-content-group { display: none; } /* 預設隱藏所有天數 */
+    .day-content-group.active { display: block; animation: fadeIn 0.3s ease; } /* 只顯示 active 的天 */
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* 卡片樣式 */
     .card { background: #fff; border-radius: 20px; padding: 18px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid rgba(255,183,178,0.1); }
+    .itinerary-card { border-left: 5px solid var(--soft-blue); }
+    .itinerary-title { font-size: 17px; font-weight: bold; color: var(--text-gray); }
+    .map-btn { display: inline-flex; align-items: center; background: #f0f7ff; color: #007aff; padding: 8px 14px; border-radius: 10px; font-size: 13px; text-decoration: none; margin-top: 10px; font-weight: 500; }
+    
+    /* 記帳輸入樣式 */
     label { font-size: 13px; color: #999; margin-bottom: 8px; display: block; }
     input, select { width: 100%; padding: 12px; margin-bottom: 15px; border: 1.5px solid #f0f0f0; border-radius: 12px; font-size: 16px; background: #fafafa; }
     button.btn-save { background: var(--primary-pink); color: white; border: none; border-radius: 15px; padding: 16px; font-size: 17px; font-weight: bold; width: 100%; box-shadow: 0 4px 0 #ff9aa2; cursor: pointer; }
-    button.btn-save:active { transform: translateY(2px); box-shadow: 0 2px 0 #ff9aa2; }
-    
-    /* 行程專用樣式 */
-    .date-divider { color: var(--primary-pink); font-weight: bold; margin: 25px 0 12px; display: flex; align-items: center; font-size: 18px; scroll-margin-top: 110px; }
-    .date-divider::after { content: ''; flex: 1; height: 1px; background: var(--warm-orange); margin-left: 10px; opacity: 0.5; }
-    .itinerary-card { border-left: 5px solid var(--soft-blue); padding-left: 15px; }
-    .itinerary-title { font-size: 17px; font-weight: bold; color: var(--text-gray); margin-bottom: 4px; }
-    .map-btn { display: inline-flex; align-items: center; background: #f0f7ff; color: #007aff; padding: 8px 14px; border-radius: 12px; font-size: 13px; text-decoration: none; margin-top: 12px; font-weight: 500; border: 1px solid rgba(0,122,255,0.1); }
   </style>
 </head>
 <body>
 
   <nav class="nav-header">
     <div class="tab-bar">
-      <div class="tab-item active" onclick="switchTab(0)">
-        <span class="tab-icon">✍️</span><span>記帳</span>
-      </div>
-      <div class="tab-item" onclick="switchTab(1)">
-        <span class="tab-icon">💰</span><span>紀錄</span>
-      </div>
-      <div class="tab-item" onclick="switchTab(2)">
-        <span class="tab-icon">🗺️</span><span>行程</span>
-      </div>
+      <div class="tab-item active" onclick="switchTab(0)"><span class="tab-icon">✍️</span><span>記帳</span></div>
+      <div class="tab-item" onclick="switchTab(1)"><span class="tab-icon">💰</span><span>紀錄</span></div>
+      <div class="tab-item" onclick="switchTab(2)"><span class="tab-icon">🗺️</span><span>行程</span></div>
     </div>
   </nav>
 
   <div class="content-area">
     <div id="page-0" class="page active">
       <div class="card">
-        <label>日期</label>
-        <input type="date" id="addDate">
-        <label>付錢的人</label>
-        <select id="addPerson"><option value="U">U</option><option value="琳">琳</option><option value="黑">黑</option><option value="丹">丹</option></select>
-        <label>項目名稱</label>
-        <input type="text" id="addItem" placeholder="例如：晚餐">
+        <label>日期</label><input type="date" id="addDate">
+        <label>付錢的人</label><select id="addPerson"><option>U</option><option>琳</option><option>黑</option><option>丹</option></select>
+        <label>項目名稱</label><input type="text" id="addItem" placeholder="例如：由布院車票">
         <div style="display:flex; gap:12px;">
-          <div style="flex:1"><label>分類</label>
-            <select id="addCategory"><option>吃 🍕</option><option>交通 🎫</option><option>住宿 🏨</option><option>購物 🛍️</option><option>其他 ✨</option></select>
-          </div>
-          <div style="flex:1"><label>金額</label>
-            <input type="number" id="addAmount" placeholder="0.00" inputmode="decimal">
-          </div>
+          <div style="flex:1"><label>分類</label><select id="addCategory"><option>吃 🍕</option><option>交通 🎫</option><option>住宿 🏨</option><option>購物 🛍️</option></select></div>
+          <div style="flex:1"><label>金額</label><input type="number" id="addAmount" placeholder="0.00" inputmode="decimal"></div>
         </div>
         <button class="btn-save" onclick="submitExpense()">儲存記帳</button>
         <div id="status-msg" style="text-align:center; margin-top:12px; font-size:13px; color:var(--primary-pink);"></div>
@@ -115,8 +105,9 @@
 
     <div id="page-1" class="page"><div id="history-content">載入中...</div></div>
 
-    <div id="page-2" class="page" style="padding-top: 0;">
-      <div id="day-nav-container" class="day-nav"></div> <div id="itinerary-content" style="padding: 20px;">載入中...</div>
+    <div id="page-2" class="page" style="padding: 0; display: flex; flex-direction: column;">
+      <div id="day-nav-container" class="day-nav"></div>
+      <div id="itinerary-content" style="flex: 1; overflow-y: auto; padding: 20px;">載入中...</div>
     </div>
   </div>
 
@@ -169,58 +160,64 @@
       return `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
         <div style="text-align:left"><b>${r["項目"]}</b> <small style="color:var(--primary-pink)">(${r["人"]})</small><br>
         <small style="color:#aaa">${r["日期"]}</small></div>
-        <div style="color:var(--primary-pink); font-weight:bold;">$${amt.toFixed(2)}</div>
+        <div style="font-weight:bold;">$${amt.toFixed(2)}</div>
       </div>`;
     }).join("");
     container.innerHTML = `<div class="card" style="background:var(--warm-orange); color:#fff; text-align:center; border:none;">總支出 $${total.toFixed(2)}</div>` + html;
   }
 
-  // --- 重點更新：行程渲染與 Day 跳轉按鈕 ---
+  // --- 行程分頁邏輯更新 ---
   function renderItinerary(data) {
     const container = document.getElementById('itinerary-content');
     const navContainer = document.getElementById('day-nav-container');
-    let currentDayLabel = "";
     let html = "";
     let navHtml = "";
-    let dayList = [];
+    let dayGroups = {}; // 用來存放每一天的資料
 
-    data.forEach((r, index) => {
-      const day = r["Day"] || "";
-      const date = r["日期"] || "";
-      const time = r["時間"] || "";
-      const title = r["標題"] || "";
-      const content = r["內容"] || "";
-      const mapKey = r["Google map"] || "";
-
-      // 建立 Day 分隔線與導航 ID
-      if (day && day !== currentDayLabel) {
-        currentDayLabel = day;
-        dayList.push(day);
-        const dayID = `day-target-${day}`;
-        html += `<div id="${dayID}" class="date-divider">${day} <span style="font-size:14px; font-weight:normal; margin-left:8px; opacity:0.7;">${date}</span></div>`;
-      }
-
-      html += `
-        <div class="card itinerary-card">
-          ${time ? `<div style="font-size:12px; color:var(--soft-blue); font-weight:bold;">⏰ ${time}</div>` : ''}
-          <div class="itinerary-title">${title}</div>
-          ${content ? `<div style="font-size:14px; color:#888; white-space:pre-wrap; margin-top:5px;">${content}</div>` : ''}
-          ${mapKey ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapKey)}" target="_blank" class="map-btn">📍 地圖：${mapKey}</a>` : ''}
-        </div>`;
+    data.forEach(r => {
+      const day = r["Day"] || "Unknown";
+      if (!dayGroups[day]) dayGroups[day] = { date: r["日期"], items: [] };
+      dayGroups[day].items.push(r);
     });
 
-    // 生成頂部按鈕
-    navHtml = dayList.map(d => `<button class="day-btn" onclick="scrollToDay('${d}')">${d}</button>`).join("");
+    const dayKeys = Object.keys(dayGroups);
+
+    dayKeys.forEach((day, index) => {
+      // 生成按鈕
+      navHtml += `<button id="btn-${day}" class="day-btn ${index === 0 ? 'active' : ''}" onclick="showDayPage('${day}')">${day}</button>`;
+
+      // 生成該天的行程內容區塊
+      html += `<div id="content-${day}" class="day-content-group ${index === 0 ? 'active' : ''}">`;
+      html += `<div style="color:var(--primary-pink); font-weight:bold; margin-bottom:15px; font-size:14px;">📅 ${dayGroups[day].date}</div>`;
+      
+      dayGroups[day].items.forEach(item => {
+        html += `
+          <div class="card itinerary-card">
+            ${item["時間"] ? `<div style="font-size:12px; color:var(--soft-blue); font-weight:bold;">⏰ ${item["時間"]}</div>` : ''}
+            <div class="itinerary-title">${item["標題"]}</div>
+            ${item["內容"] ? `<div style="font-size:14px; color:#888; white-space:pre-wrap; margin-top:5px;">${item["內容"]}</div>` : ''}
+            ${item["Google map"] ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item["Google map"])}" target="_blank" class="map-btn">📍 地圖：${item["Google map"]}</a>` : ''}
+          </div>`;
+      });
+      html += `</div>`;
+    });
+
     navContainer.innerHTML = navHtml;
     container.innerHTML = html || '<div class="card">暫無行程</div>';
   }
 
-  // 平滑捲動至指定 Day
-  function scrollToDay(day) {
-    const target = document.getElementById(`day-target-${day}`);
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+  // 切換顯示特定天數
+  function showDayPage(dayId) {
+    // 切換按鈕樣式
+    document.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(`btn-${dayId}`).classList.add('active');
+
+    // 切換內容顯示
+    document.querySelectorAll('.day-content-group').forEach(group => group.classList.remove('active'));
+    document.getElementById(`content-${dayId}`).classList.add('active');
+    
+    // 捲動回頂部
+    document.getElementById('itinerary-content').scrollTop = 0;
   }
 
   async function submitExpense() {
@@ -234,10 +231,10 @@
     params.append('amount', document.getElementById('addAmount').value);
 
     btn.disabled = true;
-    status.innerText = "🚀 傳送中...";
+    status.innerText = "🚀 儲存中...";
     try {
       await fetch(GAS_URL, { method: "POST", mode: "no-cors", body: params.toString() });
-      status.innerText = "✅ 儲存成功！";
+      status.innerText = "✅ 成功！";
       setTimeout(() => { status.innerText = ""; switchTab(1); }, 1000);
     } catch(e) { status.innerText = "❌ 失敗"; }
     btn.disabled = false;
